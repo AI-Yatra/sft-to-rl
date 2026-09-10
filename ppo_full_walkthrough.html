@@ -1,0 +1,1781 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Teaching GPT-2 Tic-Tac-Toe — every step, with real numbers</title>
+<style>
+  :root{
+    --bg:#0B1420; --panel:#121D2E; --panel-alt:#17263C; --panel-hi:#1D3049; --sidebar-bg:#0A121D;
+    --border:#24374F; --border-soft:#1C2C42;
+    --text-hi:#EAF1FA; --text-mid:#9FB3CC; --text-low:#69809F;
+    --teal:#2BB3AC; --blue:#4E93D9; --gold:#F2B134; --green:#3FB579; --red:#E25B58; --purple:#9B87E0;
+    --grid-line:#182740; --card-shadow: 0 2px 10px rgba(0,0,0,0.25);
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+    --serif: Georgia, "Iowan Old Style", "Times New Roman", serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  }
+  body.light-theme{
+    --bg:#F7F9FC; --panel:#FFFFFF; --panel-alt:#F1F4F9; --panel-hi:#E8EEF6; --sidebar-bg:#EEF2F8;
+    --border:#D7E0EC; --border-soft:#E5EAF1;
+    --text-hi:#12203A; --text-mid:#4A5A72; --text-low:#7C8CA3;
+    --teal:#128A83; --blue:#2563EB; --gold:#B8790A; --green:#1F8A4C; --red:#C0453A; --purple:#6B4FBF;
+    --grid-line:#E5EAF1; --card-shadow: 0 1px 6px rgba(20,40,70,0.08);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text-hi);font-family:var(--sans);}
+  body{min-height:100vh;}
+
+  .layout{display:grid;grid-template-columns:260px 1fr;min-height:100vh;}
+  @media (max-width:820px){ .layout{grid-template-columns:1fr;} }
+
+  /* sidebar */
+  aside{background:var(--sidebar-bg);border-right:1px solid var(--border-soft);padding:28px 20px;position:sticky;top:0;height:100vh;overflow-y:auto;}
+  @media (max-width:820px){ aside{position:static;height:auto;border-right:none;border-bottom:1px solid var(--border-soft);} }
+  aside h1{font-family:var(--serif);font-size:19px;font-weight:700;margin:0 0 4px;letter-spacing:-0.01em;line-height:1.25;}
+  aside .sub{font-size:11.5px;color:var(--text-low);margin:0 0 22px;line-height:1.5;}
+  .phase{font-family:var(--mono);font-size:10.5px;color:var(--text-low);letter-spacing:.08em;text-transform:uppercase;margin:18px 0 8px;padding-left:4px;}
+  .phase:first-of-type{margin-top:0;}
+  .nav{display:flex;flex-direction:column;gap:2px;}
+  .nav-item{display:flex;gap:10px;align-items:center;background:transparent;border:none;color:var(--text-mid);
+    padding:9px 10px;border-radius:8px;font-family:var(--sans);font-size:13px;text-align:left;cursor:pointer;
+    transition:background .12s,color .12s;line-height:1.4;}
+  .nav-item:hover{background:var(--panel);color:var(--text-hi);}
+  .nav-item.active{background:var(--panel-hi);color:var(--text-hi);}
+  .nav-num{width:22px;height:22px;border-radius:50%;background:var(--panel-alt);color:var(--text-low);
+    display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:11px;flex-shrink:0;}
+  .nav-item.active .nav-num{background:var(--teal);color:#04211F;font-weight:700;}
+  .nav-item.done .nav-num{background:var(--green);color:#0A1F13;}
+
+  .prev-next{margin-top:22px;display:flex;gap:6px;}
+  .pn-btn{flex:1;background:var(--panel);border:1px solid var(--border);color:var(--text-mid);
+    padding:8px;border-radius:6px;font-size:12px;cursor:pointer;}
+  .pn-btn:hover:not(:disabled){border-color:var(--teal);color:var(--text-hi);}
+  .pn-btn:disabled{opacity:.4;cursor:default;}
+
+  /* main */
+  main{padding:38px 40px 60px;max-width:920px;}
+  @media (max-width:820px){ main{padding:24px 18px 40px;} }
+  .step-header{margin-bottom:22px;}
+  .step-eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--teal);margin-bottom:6px;text-transform:uppercase;}
+  .step-title{font-family:var(--serif);font-size:28px;font-weight:700;margin:0 0 8px;letter-spacing:-.01em;line-height:1.2;}
+  .step-lede{font-size:14.5px;color:var(--text-mid);line-height:1.6;margin:0;max-width:640px;}
+
+  .card{background:var(--panel);border:1px solid var(--border-soft);border-radius:12px;padding:20px;margin-bottom:16px;box-shadow:var(--card-shadow);}
+  .card h3{font-size:12px;font-weight:600;color:var(--text-mid);margin:0 0 14px;letter-spacing:.02em;}
+
+  .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  @media (max-width:680px){ .grid-2{grid-template-columns:1fr;} }
+  .grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
+  @media (max-width:680px){ .grid-3{grid-template-columns:repeat(2,1fr);} }
+
+  .stat{background:var(--panel-alt);border-radius:8px;padding:12px 14px;}
+  .stat .sl{font-size:11.5px;color:var(--text-mid);margin-bottom:5px;}
+  .stat .sv{font-family:var(--mono);font-size:19px;font-weight:700;color:var(--text-hi);}
+  .stat .sv.teal{color:var(--teal);} .stat .sv.gold{color:var(--gold);} .stat .sv.g{color:var(--green);} .stat .sv.r{color:var(--red);}
+  .stat .sn{font-size:11px;color:var(--text-low);margin-top:3px;}
+
+  button.action{background:var(--gold);color:#3A2600;border:none;padding:9px 16px;border-radius:7px;
+    font-family:var(--sans);font-size:13px;font-weight:700;cursor:pointer;}
+  button.action:disabled{opacity:.55;cursor:default;}
+  button.ghost{background:transparent;border:1px solid var(--border);color:var(--text-mid);padding:8px 14px;border-radius:7px;
+    font-family:var(--sans);font-size:12.5px;cursor:pointer;}
+  button.ghost:hover{border-color:var(--teal);color:var(--text-hi);}
+
+  .board-svg{background:transparent;}
+  code, .mono{font-family:var(--mono);}
+  .note{font-size:12px;color:var(--text-low);line-height:1.6;margin-top:10px;}
+  .kbd{font-family:var(--mono);font-size:11.5px;background:var(--panel-alt);padding:1px 6px;border-radius:4px;color:var(--text-mid);}
+
+  /* prompt block */
+  .prompt-box{background:#0A121D;border:1px solid #1C2C42;border-radius:8px;padding:14px;
+    font-family:var(--mono);font-size:12.5px;color:#EAF1FA;line-height:1.65;white-space:pre;overflow-x:auto;}
+  .prompt-box .lbl{color:#69809F;}
+  .prompt-box .hi{color:#F2B134;}
+
+  /* token grid (step 3) */
+  .vocab-grid{display:grid;grid-template-columns:repeat(20,1fr);gap:2px;margin-top:12px;}
+  .vocab-cell{aspect-ratio:1/1;background:var(--panel-alt);border-radius:2px;position:relative;}
+  .vocab-cell.action{background:var(--teal);}
+  .vocab-cell.action:hover::after{content:attr(data-tok);position:absolute;bottom:110%;left:50%;transform:translateX(-50%);
+    background:#000;color:#fff;padding:2px 6px;border-radius:3px;font-family:var(--mono);font-size:11px;white-space:nowrap;}
+  .action-row{display:flex;gap:6px;margin-top:14px;flex-wrap:wrap;}
+  .action-chip{background:var(--panel-alt);border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-family:var(--mono);font-size:12px;color:var(--text-hi);}
+  .action-chip.blocked{opacity:.28;text-decoration:line-through;}
+  .action-chip .n{color:var(--teal);font-weight:700;}
+
+  /* enumerate animation (step 1) */
+  .enum-bar-row{display:grid;grid-template-columns:36px 60px 1fr 90px;gap:10px;align-items:center;padding:5px 0;font-family:var(--mono);font-size:12px;}
+  .enum-bar-row .plyLabel{color:var(--text-low);}
+  .enum-bar-row .count{color:var(--text-hi);text-align:right;}
+  .enum-bar-row .bar{background:var(--panel-alt);height:14px;border-radius:2px;overflow:hidden;}
+  .enum-bar-row .bar > div{height:100%;background:var(--teal);transition:width .8s ease;}
+  .enum-bar-row.total .count{color:var(--gold);font-weight:700;}
+  .enum-bar-row.total .bar>div{background:var(--gold);}
+
+  /* discount table + buffer table */
+  table.grid{width:100%;border-collapse:collapse;margin-top:8px;font-family:var(--mono);font-size:12.5px;}
+  table.grid th, table.grid td{padding:8px 10px;text-align:left;border-bottom:1px solid var(--border-soft);}
+  table.grid th{font-weight:600;color:var(--text-mid);font-size:11px;letter-spacing:.03em;text-transform:uppercase;background:var(--panel-alt);}
+  table.grid td.num{text-align:right;}
+  table.grid td.win{color:var(--green);font-weight:700;}
+  table.grid tr.emph td{background:rgba(63,181,121,.08);}
+
+  /* PPO update mini gauge */
+  .gauge-track{position:relative;height:28px;border-radius:6px;background:var(--panel-alt);border:1px solid var(--border);overflow:hidden;margin:6px 0;}
+  .gauge-band{position:absolute;top:0;bottom:0;background:rgba(63,181,121,.18);border-left:1px solid rgba(63,181,121,.55);border-right:1px solid rgba(63,181,121,.55);}
+  .gauge-marker{position:absolute;top:2px;bottom:2px;width:3px;background:var(--teal);transition:left .4s cubic-bezier(.4,0,.2,1),background .2s;}
+  .gauge-marker.clip{background:var(--red);}
+  .gauge-ticks{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;color:var(--text-low);margin-top:2px;padding:0 1px;}
+
+  /* discard step */
+  .buffer-tag{display:inline-block;background:var(--panel-alt);border:1px solid var(--border);border-radius:5px;padding:3px 8px;font-family:var(--mono);font-size:11px;color:var(--text-mid);margin:3px;}
+  .buffer-tag.stale{opacity:.28;text-decoration:line-through;}
+
+  /* Step 9 chart */
+  .curves-svg{width:100%;display:block;}
+  .legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:var(--text-mid);margin-top:8px;}
+  .legend span{display:inline-flex;align-items:center;gap:6px;}
+  .legend i{width:10px;height:10px;border-radius:2px;}
+
+  /* stepper controls in main */
+  .step-footer{display:flex;justify-content:space-between;align-items:center;margin-top:26px;padding-top:20px;border-top:1px solid var(--border-soft);}
+  .step-footer .prog{font-family:var(--mono);font-size:11.5px;color:var(--text-low);}
+</style>
+</head>
+<body>
+<div class="layout">
+  <aside>
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;">
+      <div>
+        <h1>Teaching GPT-2 tic-tac-toe</h1>
+        <p class="sub">Every step of data prep and training, with the real numbers substituted into every formula.</p>
+      </div>
+      <button id="themeToggle" class="ghost" title="Toggle light/dark theme"
+        style="flex-shrink:0;padding:6px 9px;font-size:14px;line-height:1;">🌙</button>
+    </div>
+    <div id="nav"></div>
+    <div class="prev-next">
+      <button class="pn-btn" id="prevBtn">← Prev</button>
+      <button class="pn-btn" id="nextBtn">Next →</button>
+    </div>
+  </aside>
+  <main id="main"></main>
+</div>
+
+<script>
+/* ============================================================================
+   THEME
+   ========================================================================= */
+let LIGHT_THEME = false;
+function toggleTheme(){
+  LIGHT_THEME = !LIGHT_THEME;
+  document.body.classList.toggle("light-theme", LIGHT_THEME);
+  document.getElementById("themeToggle").textContent = LIGHT_THEME ? "☀️" : "🌙";
+  renderAll();   // re-run the current step's render so any JS-drawn charts pick up new CSS vars
+}
+document.getElementById("themeToggle").onclick = toggleTheme;
+
+/* ============================================================================
+   SHARED MATH — all exact, matches ppo_update
+   ========================================================================= */
+function mean(a){return a.reduce((x,y)=>x+y,0)/a.length;}
+function sampleStd(a){const m=mean(a);const v=a.reduce((s,x)=>s+(x-m)**2,0)/(a.length-1);return Math.sqrt(v);}
+function clamp(x,lo,hi){return Math.max(lo,Math.min(hi,x));}
+
+const CLIP=0.2, VF_COEF=0.5, ENT_COEF=0.02;
+const GAMMA=0.98;
+const LR=0.09, ALPHA=0.3;   // toy per-epoch drift (labeled illustrative)
+const EPOCHS=4;
+
+function computeAdv(rets, values){
+  const raw = rets.map((r,i)=>r-values[i]);
+  const m = mean(raw), s = sampleStd(raw);
+  return {raw, norm: raw.map(x=>(x-m)/(s+1e-8)), mean:m, std:s};
+}
+
+function trainingSim(oldLogp, values, rets){
+  const {raw, norm:adv} = computeAdv(rets, values);
+  let logp=oldLogp.slice(), vals=values.slice();
+  const logpHist=[logp.slice()], valHist=[vals.slice()];
+  for(let e=1;e<=EPOCHS;e++){
+    const newLogp = logp.map((lp,i)=>{
+      const ratio = Math.exp(lp - oldLogp[i]);
+      const clipped = (adv[i]>0 && ratio>=1+CLIP) || (adv[i]<0 && ratio<=1-CLIP);
+      return lp + (clipped ? 0 : LR*adv[i]);
+    });
+    const newVals = vals.map((v,i)=> v + ALPHA*(rets[i]-v));
+    logp=newLogp; vals=newVals;
+    logpHist.push(logp.slice()); valHist.push(vals.slice());
+  }
+  return {adv, advRaw:raw, logpHist, valHist};
+}
+
+function termsAt(sim, oldLogp, rets, e, i){
+  const lp = sim.logpHist[e][i];
+  const ratio = Math.exp(lp - oldLogp[i]);
+  const clippedRatio = clamp(ratio, 1-CLIP, 1+CLIP);
+  const unclip = ratio * sim.adv[i];
+  const clipT = clippedRatio * sim.adv[i];
+  const pgTerm = -Math.min(unclip, clipT);
+  const clipBinding = clipT < unclip;
+  const v = sim.valHist[e][i];
+  const vlossTerm = (rets[i]-v)**2;
+  return {lp, ratio, clippedRatio, unclip, clipT, pgTerm, clipBinding, v, vlossTerm};
+}
+
+/* ============================================================================
+   REAL, EXACT DATA (from the game tree enumeration)
+   ========================================================================= */
+const TREE = [  // {distinct, ongoing, ends}
+  {p:0, distinct:1,    ongoing:1,    ends:0},
+  {p:1, distinct:9,    ongoing:9,    ends:0},
+  {p:2, distinct:72,   ongoing:72,   ends:0},
+  {p:3, distinct:252,  ongoing:252,  ends:0},
+  {p:4, distinct:756,  ongoing:756,  ends:0},
+  {p:5, distinct:1260, ongoing:1140, ends:120},
+  {p:6, distinct:1520, ongoing:1372, ends:148},
+  {p:7, distinct:1140, ongoing:696,  ends:444},
+  {p:8, distinct:390,  ongoing:222,  ends:168},
+  {p:9, distinct:78,   ongoing:0,    ends:78 },
+];
+const TOTAL_DISTINCT = 5478, TOTAL_ONGOING = 4520, TOTAL_ENDS = 958, COMPLETE_GAMES = 255168;
+const CANONICAL_CLASSES = 627;
+const CHANCE_TOP1 = 0.4941, CHANCE_BLUNDER = 0.3402;
+const REF_RANDOM = {win:0.4365, draw:0.1270, loss:0.4365};
+const REF_PERFECT = {win:0.9006, draw:0.0994, loss:0.0000};
+
+/* The worked example — one 3-move game, X wins by 0-1-2 */
+const MOVES = [
+  {label:"move 1", cell:0, board:["","","","","","","","",""], oldLogp:-1.897, value0:0.10, ret:0.9604, note:"opening — 9 legal cells, low confidence"},
+  {label:"move 2", cell:1, board:["X","","","","O","","","",""], oldLogp:-1.050, value0:0.55, ret:0.98,   note:"building the top row"},
+  {label:"move 3", cell:2, board:["X","X","","O","O","","","",""], oldLogp:-0.511, value0:0.90, ret:1.00,   note:"completes 0-1-2 → WIN", win:true},
+];
+const OLD_LOGP = MOVES.map(m=>m.oldLogp);
+const VALUES0 = MOVES.map(m=>m.value0);
+const RETS = MOVES.map(m=>m.ret);
+const SIM = trainingSim(OLD_LOGP, VALUES0, RETS);
+const ENTROPY_TOY = [1.10, 1.02, 0.95, 0.89, 0.84];
+
+/* Shared dimension-reduced (D=6) stand-in for the value head, used in Step 4's demo
+   AND Step 7's backprop visualization, so both show the SAME verified numbers.
+   Forward and backward were cross-checked against finite differences (max diff < 1e-4). */
+const TOY_D = 6;
+const TOY_H  = [0.42, -0.15, 0.63, 0.08, -0.31, 0.20];
+const TOY_W1 = [
+  [ 0.10, -0.20,  0.05,  0.15, -0.10,  0.02],
+  [-0.05,  0.12,  0.08, -0.02,  0.11, -0.09],
+  [ 0.07,  0.03, -0.14,  0.09,  0.02,  0.06],
+  [ 0.15, -0.06,  0.02, -0.11,  0.08,  0.04],
+  [-0.09,  0.10,  0.06,  0.03, -0.07,  0.13],
+  [ 0.04, -0.03,  0.11,  0.07,  0.05, -0.08],
+];
+const TOY_B1 = [0.01, -0.02, 0.00, 0.03, -0.01, 0.02];
+const TOY_W2 = [0.30, -0.25, 0.40, 0.18, -0.22, 0.35];
+const TOY_B2 = 0.05;
+const TOY_RET = RETS[0];   // fixed worked example: move 1's outcome, 0.9604
+
+function toyForward(h){
+  const z1_pre = TOY_W1.map((row,j) => row.reduce((s,w,i)=>s+w*h[i], 0) + TOY_B1[j]);
+  const z1 = z1_pre.map(Math.tanh);
+  const value = z1.reduce((s,z,j)=>s+z*TOY_W2[j], 0) + TOY_B2;
+  return { z1_pre, z1, value };
+}
+function toyBackward(h, ret){
+  const { z1_pre, z1, value } = toyForward(h);
+  const dValue = 2 * (value - ret);                                  // d(vloss)/d(value)
+  const dW2 = z1.map(z => dValue * z);                                // d(vloss)/d(W2)
+  const dB2 = dValue;
+  const dZ1 = TOY_W2.map(w => dValue * w);                            // d(vloss)/d(z1)
+  const dZ1pre = dZ1.map((d,j) => d * (1 - z1[j]*z1[j]));             // through tanh
+  const dW1 = dZ1pre.map(dj => h.map(hi => dj * hi));                 // d(vloss)/d(W1)
+  const dB1 = dZ1pre.slice();
+  const dH = h.map((_,i) => TOY_W1.reduce((s,row,j) => s + row[i]*dZ1pre[j], 0));  // -> continues into GPT-2
+  return { value, vloss: (ret-value)**2, dValue, dW2, dB2, dZ1, dZ1pre, dW1, dB1, dH };
+}
+
+/* Training-curve illustrative shape, calibrated to the numbers we measured */
+const CURVE_POINTS = 40;
+function trainingCurves(){
+  // loss rate falls from ~0.43 to ~0.09; opponent randomness anneals 1.0 -> 0.30
+  const out=[];
+  for(let i=0;i<CURVE_POINTS;i++){
+    const t = i/(CURVE_POINTS-1);
+    const p_rand = 1.0 + Math.min(1,t/0.6)*(0.30 - 1.0);
+    const loss = 0.425 * Math.exp(-2.6*t) + 0.09*(1-Math.exp(-4*t));
+    const win  = 0.575 + (0.795 - 0.575)*(1 - Math.exp(-3.2*t));
+    const top1 = 0.51 + (0.78 - 0.51)*(1 - Math.exp(-2.8*t));
+    out.push({t, iter: Math.round(t*150), p_rand, loss, win, top1});
+  }
+  return out;
+}
+const CURVES = trainingCurves();
+
+/* ============================================================================
+   STEP DEFINITIONS
+   ========================================================================= */
+const STEPS = [
+  {phase:"Data preparation", title:"Enumerate the game tree",
+   lede:"Tic-tac-toe is small enough to list every position exactly. This is the state space the model will be graded against.",
+   render: renderEnumerate},
+  {phase:"Data preparation", title:"Turn a board into text",
+   lede:"The model only reads text, so each board becomes a prompt that ends mid-sentence — the next thing the model wants to say is the move.",
+   render: renderPrompt},
+  {phase:"Data preparation", title:"Pick nine tokens as the answers",
+   lede:"Out of ~50,000 tokens in the vocabulary, only nine count as answers. Occupied cells are masked to probability zero, so the model literally cannot play an illegal move.",
+   render: renderTokens},
+  {phase:"One PPO iteration", title:"Play games and record decisions",
+   lede:"128 games are played in parallel with the current model. Each decision the model makes becomes one row in a training buffer.",
+   render: renderPlayGames},
+  {phase:"One PPO iteration", title:"Score outcomes, share back through the game",
+   lede:"Each game ends with +1, 0, or −1. That single number is shared over the model's own moves in that game, discounted by 0.98 per step back.",
+   render: renderDiscount},
+  {phase:"One PPO iteration", title:"Compute advantages — “was that a surprise?”",
+   lede:"For every decision, compare what actually happened to what the value head expected. The gap is what training reacts to.",
+   render: renderAdvantage},
+  {phase:"One PPO iteration", title:"The PPO update: four passes over the same buffer",
+   lede:"The clipped surrogate objective lets the same games be reused four times before being thrown away. Step through the passes to see the ratio grow, the clip engage, and the value head fit.",
+   render: renderPPOUpdate},
+  {phase:"One PPO iteration", title:"Throw the buffer away",
+   lede:"After four passes, the model has changed and the games no longer describe how it plays. Discard, then go back to Step 4.",
+   render: renderDiscard},
+  {phase:"Across many iterations", title:"What 150 iterations look like",
+   lede:"Loss rate, win rate, and position-level accuracy across a full run — with reference points for what \"no skill\" and \"perfect play\" score.",
+   render: renderCurves},
+  {phase:"Using the trained model", title:"Predicting after training",
+   lede:"Playing a move never uses the value head — only the 9 probabilities do. Here's the forward pass, once training is over.",
+   render: renderPredict},
+];
+
+let currentStep = 0;
+let stepState = {};   // per-step transient state
+
+/* ============================================================================
+   NAVIGATION
+   ========================================================================= */
+function renderNav(){
+  const nav = document.getElementById("nav");
+  nav.innerHTML = "";
+  let lastPhase = null;
+  STEPS.forEach((s,i)=>{
+    if(s.phase !== lastPhase){
+      const p = document.createElement("div");
+      p.className = "phase"; p.textContent = s.phase; nav.appendChild(p);
+      lastPhase = s.phase;
+    }
+    const b = document.createElement("button");
+    b.className = "nav-item" + (i===currentStep ? " active" : "") + (i<currentStep ? " done" : "");
+    b.innerHTML = `<span class="nav-num">${i+1}</span><span>${s.title}</span>`;
+    b.onclick = ()=>{ currentStep=i; renderAll(); };
+    nav.appendChild(b);
+  });
+  document.getElementById("prevBtn").disabled = currentStep===0;
+  document.getElementById("nextBtn").disabled = currentStep===STEPS.length-1;
+}
+
+document.getElementById("prevBtn").onclick = ()=>{ if(currentStep>0){currentStep--; renderAll();} };
+document.getElementById("nextBtn").onclick = ()=>{ if(currentStep<STEPS.length-1){currentStep++; renderAll();} };
+
+function renderAll(){
+  renderNav();
+  const s = STEPS[currentStep];
+  const main = document.getElementById("main");
+  main.innerHTML = `
+    <div class="step-header">
+      <div class="step-eyebrow">${s.phase} · step ${currentStep+1} of ${STEPS.length}</div>
+      <h2 class="step-title">${s.title}</h2>
+      <p class="step-lede">${s.lede}</p>
+    </div>
+    <div id="stepBody"></div>
+    <div class="step-footer">
+      <button class="ghost" id="footPrev" ${currentStep===0?"disabled":""}>← ${currentStep===0?"":STEPS[currentStep-1].title}</button>
+      <span class="prog">${currentStep+1} / ${STEPS.length}</span>
+      <button class="ghost" id="footNext" ${currentStep===STEPS.length-1?"disabled":""}>${currentStep===STEPS.length-1?"":STEPS[currentStep+1].title} →</button>
+    </div>`;
+  document.getElementById("footPrev").onclick = ()=>{ if(currentStep>0){currentStep--; renderAll();window.scrollTo(0,0);} };
+  document.getElementById("footNext").onclick = ()=>{ if(currentStep<STEPS.length-1){currentStep++; renderAll();window.scrollTo(0,0);} };
+  stepState = {};
+  s.render(document.getElementById("stepBody"));
+}
+window.renderAll = renderAll;
+
+/* ============================================================================
+   HELPERS
+   ========================================================================= */
+function boardSVG(board, size=140, opts={}){
+  const cell = size/3;
+  let html = `<svg class="board-svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">`;
+  for(let k=1;k<3;k++){
+    html += `<line x1="${k*cell}" y1="4" x2="${k*cell}" y2="${size-4}" stroke="#33507A" stroke-width="1.5"/>`;
+    html += `<line x1="4" y1="${k*cell}" x2="${size-4}" y2="${k*cell}" stroke="#33507A" stroke-width="1.5"/>`;
+  }
+  board.forEach((v,idx)=>{
+    const r=Math.floor(idx/3), c=idx%3;
+    const cx=c*cell+cell/2, cy=r*cell+cell/2;
+    if(v==="X") html += `<text x="${cx}" y="${cy+cell*0.15}" font-family="Georgia" font-size="${cell*0.6}" font-weight="700" fill="#4E93D9" text-anchor="middle">X</text>`;
+    else if(v==="O") html += `<text x="${cx}" y="${cy+cell*0.15}" font-family="Georgia" font-size="${cell*0.6}" font-weight="700" fill="#E25B58" text-anchor="middle">O</text>`;
+    else if(opts.showNums) html += `<text x="${cx}" y="${cy+cell*0.1}" font-family="ui-monospace" font-size="${cell*0.28}" fill="#69809F" text-anchor="middle">${idx}</text>`;
+  });
+  if(opts.highlight!=null){
+    const r=Math.floor(opts.highlight/3), c=opts.highlight%3;
+    const cx=c*cell+cell/2, cy=r*cell+cell/2;
+    html += `<circle cx="${cx}" cy="${cy}" r="${cell*0.35}" fill="none" stroke="#F2B134" stroke-width="2" stroke-dasharray="4 3"/>`;
+  }
+  return html + "</svg>";
+}
+function fmt(x,d=4){return (x>=0?" ":"") + x.toFixed(d);}
+function sgn(x,d=4){return (x>=0?"+":"") + x.toFixed(d);}
+
+/* ============================================================================
+   STEP 1 — enumerate
+   ========================================================================= */
+function renderEnumerate(root){
+  root.innerHTML = `
+    <div class="card">
+      <h3>animated: walk the tree from the empty board</h3>
+      <p style="font-size:13.5px;color:var(--text-mid);line-height:1.6;margin:0 0 12px;">
+        A depth-first walk visits every reachable board. Duplicates (same board reached in different move orders) are merged.
+        Click <b>play</b> to add positions ply by ply.
+      </p>
+      <div id="enumBars"></div>
+      <div style="display:flex;gap:10px;margin-top:14px;">
+        <button class="action" id="enumPlay">▶ play</button>
+        <button class="ghost" id="enumFull">jump to end</button>
+        <button class="ghost" id="enumReset">reset</button>
+      </div>
+    </div>
+
+    <div class="grid-3">
+      <div class="stat"><div class="sl">complete games in the tree</div><div class="sv gold">${COMPLETE_GAMES.toLocaleString()}</div><div class="sn">every legal move sequence, start to finish</div></div>
+      <div class="stat"><div class="sl">distinct boards</div><div class="sv teal">${TOTAL_DISTINCT.toLocaleString()}</div><div class="sn">after merging identical boards</div></div>
+      <div class="stat"><div class="sl">decision positions</div><div class="sv teal">${TOTAL_ONGOING.toLocaleString()}</div><div class="sn">boards where a move is required (this is the dataset)</div></div>
+    </div>
+
+    <div class="card" style="margin-top:16px;">
+      <h3>what falls out of this</h3>
+      <p style="font-size:13.5px;color:var(--text-mid);line-height:1.7;margin:0;">
+        These <b>${TOTAL_ONGOING.toLocaleString()}</b> positions are the state space the model is graded on later
+        (Step 9's position-level metric). They are enumerated once and never
+        change — no sampling, no noise, no confidence intervals needed.
+      </p>
+      <p class="note">
+        Note: rotations and mirrors of a board are the same puzzle. The ${TOTAL_ONGOING.toLocaleString()} positions
+        collapse to just <b class="mono" style="color:var(--gold)">${CANONICAL_CLASSES}</b> distinct puzzles when
+        those symmetries are merged — important later if you split for supervised training.
+      </p>
+    </div>
+  `;
+
+  const bars = document.getElementById("enumBars");
+  const maxDist = Math.max(...TREE.map(t=>t.distinct));
+
+  function draw(uptoPly){
+    let html = "";
+    let running = 0;
+    for(const row of TREE){
+      const shown = row.p <= uptoPly ? row.distinct : 0;
+      const pct = shown / maxDist * 100;
+      running += shown;
+      html += `<div class="enum-bar-row">
+        <span class="plyLabel">ply ${row.p}</span>
+        <span class="mono" style="color:var(--text-mid);text-align:right;">${row.distinct.toLocaleString()}</span>
+        <div class="bar"><div style="width:${pct}%;"></div></div>
+        <span class="count">${shown.toLocaleString()}</span>
+      </div>`;
+    }
+    html += `<div class="enum-bar-row total" style="margin-top:6px;border-top:1px solid var(--border-soft);padding-top:8px;">
+      <span class="plyLabel">total</span>
+      <span></span>
+      <div class="bar"><div style="width:${running/TOTAL_DISTINCT*100}%;"></div></div>
+      <span class="count">${running.toLocaleString()}</span>
+    </div>`;
+    bars.innerHTML = html;
+  }
+
+  let ply = -1, timer = null;
+  draw(-1);
+  function step(){
+    ply++;
+    if(ply > 9){ clearInterval(timer); timer=null; document.getElementById("enumPlay").textContent="▶ play"; return; }
+    draw(ply);
+  }
+  document.getElementById("enumPlay").onclick = ()=>{
+    if(timer){ clearInterval(timer); timer=null; document.getElementById("enumPlay").textContent="▶ play"; return; }
+    if(ply>=9) ply=-1;
+    document.getElementById("enumPlay").textContent="⏸ pause";
+    timer = setInterval(step, 550);
+    step();
+  };
+  document.getElementById("enumFull").onclick = ()=>{ if(timer){clearInterval(timer);timer=null;} ply=9; draw(9); document.getElementById("enumPlay").textContent="▶ play"; };
+  document.getElementById("enumReset").onclick = ()=>{ if(timer){clearInterval(timer);timer=null;} ply=-1; draw(-1); document.getElementById("enumPlay").textContent="▶ play"; };
+}
+
+/* ============================================================================
+   STEP 2 — board as text
+   ========================================================================= */
+function renderPrompt(root){
+  const examples = [
+    {name:"empty board", board:["","","","","","","","",""], mark:"X"},
+    {name:"after 2 moves", board:["X","","","","O","","","",""], mark:"X"},
+    {name:"mid-game with a block to make", board:["X","","","O","O","","","","X"], mark:"X"},
+    {name:"nearly full", board:["X","O","X","","X","O","O","",""], mark:"X"},
+  ];
+  let currentEx = 2;
+
+  root.innerHTML = `
+    <div class="card">
+      <h3>pick a board — the prompt updates live</h3>
+      <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:16px;" id="exRow"></div>
+      <div class="grid-2">
+        <div style="text-align:center;">
+          <div id="exBoard"></div>
+          <div style="font-size:11.5px;color:var(--text-low);margin-top:8px;font-family:var(--mono);">X to move</div>
+        </div>
+        <div>
+          <div style="font-size:12px;color:var(--text-mid);margin-bottom:6px;">this is exactly what GPT-2 reads:</div>
+          <div class="prompt-box" id="promptBox"></div>
+        </div>
+      </div>
+      <p class="note">
+        The prompt <b>stops mid-sentence</b> on purpose. A language model's job is predicting the next token — so
+        cutting off after <span class="hi mono" style="color:var(--gold)">Best cell:</span> means the next thing the model
+        wants to produce <i>is</i> the move. That is the whole trick — no fine-tuning of prompt format needed.
+      </p>
+    </div>
+
+    <div class="card">
+      <h3>why the "Legal cells" line exists</h3>
+      <p style="font-size:13.5px;color:var(--text-mid);line-height:1.7;margin:0;">
+        The model could infer legality by reading the grid, but stating it explicitly is easier for the transformer
+        to attend to. It's a hint, not an enforcement — the enforcement is the mask in Step 3.
+      </p>
+    </div>
+  `;
+
+  const exRow = document.getElementById("exRow");
+  examples.forEach((ex,i)=>{
+    const b = document.createElement("button");
+    b.className = "ghost"; b.textContent = ex.name;
+    if(i===currentEx) b.style.borderColor = "var(--teal)";
+    b.onclick = ()=>{ currentEx = i; drawEx(); };
+    exRow.appendChild(b);
+  });
+
+  function drawEx(){
+    exRow.querySelectorAll("button").forEach((b,i)=>{ b.style.borderColor = i===currentEx ? "var(--teal)" : ""; });
+    const ex = examples[currentEx];
+    document.getElementById("exBoard").innerHTML = boardSVG(ex.board, 170, {showNums:true});
+    const gridText = [0,3,6].map(r => ex.board.slice(r,r+3).map(v=>v||".").join(" ")).join("\n");
+    const legal = ex.board.map((v,i)=>v?null:i).filter(x=>x!==null).join(" ");
+    document.getElementById("promptBox").innerHTML =
+`<span class="lbl">Tic-tac-toe. Cells are numbered 0-8, left to right, top to bottom.
+You are X. Opponent is O.
+Board:
+</span>${gridText}<span class="lbl">
+Legal cells: </span>${legal}<span class="hi">
+Best cell:</span>`;
+  }
+  drawEx();
+}
+
+/* ============================================================================
+   STEP 3 — action tokens + mask
+   ========================================================================= */
+function renderTokens(root){
+  root.innerHTML = `
+    <div class="card">
+      <h3>the vocabulary has ~50,000 tokens. we only ever look at 9.</h3>
+      <div class="vocab-grid" id="vocab"></div>
+      <p class="note" style="text-align:center;margin-top:10px;">
+        Every teal cell is one of the 9 answer tokens: <span class="mono">" 0"</span> through <span class="mono">" 8"</span>
+        (single tokens in GPT-2). Every grey cell is ignored.
+      </p>
+    </div>
+
+    <div class="card">
+      <h3>then: block occupied cells to probability zero</h3>
+      <div class="grid-2">
+        <div style="text-align:center;">
+          <div id="maskBoard"></div>
+          <div style="font-size:11.5px;color:var(--text-low);margin-top:8px;font-family:var(--mono);">click a cell to toggle X/O</div>
+        </div>
+        <div>
+          <div style="font-size:12px;color:var(--text-mid);margin-bottom:10px;">available actions after masking:</div>
+          <div class="action-row" id="actionRow"></div>
+          <p class="note" style="margin-top:16px;">
+            Occupied cells get logit <span class="mono">−∞</span>, which softmaxes to <b>exactly zero</b>.
+            The model cannot output them. This is why all of training is spent on move quality — not on learning legality.
+          </p>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // vocab grid: 20 rows × 20 cols = 400 sample cells; sprinkle 9 action ones
+  const vocab = document.getElementById("vocab");
+  const grid = 20*20;
+  const actionPositions = [45, 78, 123, 156, 189, 222, 255, 288, 321];  // arbitrary
+  let html = "";
+  for(let i=0;i<grid;i++){
+    const idx = actionPositions.indexOf(i);
+    if(idx>=0) html += `<div class="vocab-cell action" data-tok="' ${idx}'"></div>`;
+    else html += `<div class="vocab-cell"></div>`;
+  }
+  vocab.innerHTML = html;
+
+  // interactive board
+  let board = ["X","","","","O","","","",""];
+  function drawMask(){
+    document.getElementById("maskBoard").innerHTML = boardSVG(board, 170, {showNums:true});
+    const row = document.getElementById("actionRow");
+    row.innerHTML = "";
+    for(let i=0;i<9;i++){
+      const chip = document.createElement("div");
+      const blocked = board[i] !== "";
+      chip.className = "action-chip" + (blocked ? " blocked" : "");
+      chip.innerHTML = blocked ? `${i} <span style="color:var(--red);font-size:10px;">masked</span>` : `<span class="n">${i}</span> · free`;
+      row.appendChild(chip);
+    }
+    // click handlers on svg cells
+    const svg = document.getElementById("maskBoard").querySelector("svg");
+    for(let i=0;i<9;i++){
+      const r=Math.floor(i/3), c=i%3, sz=170/3;
+      const rect = document.createElementNS("http://www.w3.org/2000/svg","rect");
+      rect.setAttribute("x", c*sz); rect.setAttribute("y", r*sz);
+      rect.setAttribute("width", sz); rect.setAttribute("height", sz);
+      rect.setAttribute("fill", "transparent"); rect.style.cursor="pointer";
+      rect.addEventListener("click", ()=>{
+        board[i] = board[i]==="" ? "X" : board[i]==="X" ? "O" : "";
+        drawMask();
+      });
+      svg.appendChild(rect);
+    }
+  }
+  drawMask();
+}
+
+/* ============================================================================
+   STEP 4 — play games (animated batch)
+   ========================================================================= */
+function renderPlayGames(root){
+  root.innerHTML = `
+    <div class="card">
+      <h3>assumptions for this step</h3>
+      <div class="grid-3">
+        <div class="stat"><div class="sl">batch size shown here, <span class="mono">B</span></div><div class="sv teal">4</div><div class="sn">real run: <span class="mono">B ≤ games_per_iter = 128</span></div></div>
+        <div class="stat"><div class="sl">hidden size, <span class="mono">D</span></div><div class="sv teal">768</div><div class="sn">GPT-2 124M's hidden dimension</div></div>
+        <div class="stat"><div class="sl">action tokens</div><div class="sv teal">9</div><div class="sn">out of a 50,257-token vocabulary</div></div>
+      </div>
+      <p class="note">
+        <b>Game 1 below plays the exact game used in Steps 5–8</b> (X wins by 0-1-2). Its recorded
+        <span class="mono">logp</span> and <span class="mono">value</span> are the same numbers those later
+        steps use — not new random ones — so you can trace one decision all the way through the pipeline.
+      </p>
+    </div>
+
+    <div class="card">
+      <h3>dimension flow for one decision, batch of <span class="mono">B</span></h3>
+      <div id="dimFlow" style="overflow-x:auto;"></div>
+      <p class="note">
+        <span class="mono">h</span> is shared by both heads. The policy head projects onto only 9 of the
+        50,257 vocabulary rows; the value head is a small separate MLP. Both read the same <span class="mono">h</span>.
+      </p>
+    </div>
+
+    <div class="card">
+      <h3>4 mini-games run in parallel (128 in the real code)</h3>
+      <div id="miniGames" style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:14px;"></div>
+      <div style="display:flex;gap:10px;align-items:center;">
+        <button class="action" id="playAdvance">▶ next move</button>
+        <button class="ghost" id="playReset">reset</button>
+        <span class="mono" style="font-size:12px;color:var(--text-low);margin-left:auto;">
+          buffer so far: <b id="bufSize" style="color:var(--teal)">0</b> decisions
+        </span>
+      </div>
+    </div>
+
+    <div class="card" id="spotlightCard" style="display:none;">
+      <h3>spotlight: game 1's latest decision, worked with real equations</h3>
+      <div id="spotlightBody"></div>
+    </div>
+
+    <div class="card">
+      <h3>the value head, worked numerically (dimension-reduced so the arithmetic fits on screen)</h3>
+      <p style="font-size:12.5px;color:var(--text-mid);line-height:1.6;margin:0 0 12px;">
+        This shows the <i>operation</i> — <span class="mono">Linear → Tanh → Linear</span> — using
+        <span class="mono">D=6</span> instead of the real <span class="mono">D=768</span> so every number is
+        visible. The shapes labeled are the real ones; the specific 6 numbers below are illustrative, not
+        derived from GPT-2.
+      </p>
+      <div id="valueMlpDemo"></div>
+    </div>
+
+    <div class="card">
+      <h3>the buffer: one row per decision the model made</h3>
+      <div style="overflow-x:auto;">
+        <table class="grid" id="bufTable">
+          <thead><tr><th>game</th><th>move #</th><th>action</th><th>logp</th><th>value</th><th>ret</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <p class="note">
+        Each row was collected with <span class="mono">@torch.no_grad()</span> — no gradients yet, just recording what happened.
+        <b>Notice what is NOT recorded:</b> the correct move. Nobody looked it up. Not even the solver was consulted.
+      </p>
+    </div>
+  `;
+
+  /* ---------- dimension-flow diagram ---------- */
+  renderDimFlow(document.getElementById("dimFlow"));
+
+  /* ---------- value-head numeric demo (D=6, fixed & deterministic) ---------- */
+  renderValueMlpDemo(document.getElementById("valueMlpDemo"));
+
+  /* ---------- game scripts: game 1 EXACTLY matches the MOVES worked example ---------- */
+  const gameScripts = [
+    [["X",0],["O",4],["X",1],["O",3],["X",2]],                                   // g0: matches MOVES exactly
+    [["X",4],["O",0],["X",8],["O",2],["X",6],["O",3],["X",5],["O",7],["X",1]],   // g1: agent=O, draws
+    [["X",8],["O",4],["X",0],["O",7],["X",5],["O",1]],                           // g2: agent=X, loses
+    [["X",4],["O",0],["X",8],["O",3],["X",7],["O",6]],                           // g3: agent=O, wins
+  ];
+
+  // fixed, deterministic (not random) logp/value for games 2-4's decisions,
+  // so numbers are reproducible on every reset — same spirit as game 1.
+  const FIXED_DECISION_STATS = {
+    1: [{logp:-1.42, value:0.05}, {logp:-1.08, value:-0.20}, {logp:-0.95, value:0.15}, {logp:-1.30, value:0.40}],
+    2: [{logp:-1.61, value:0.30}, {logp:-1.15, value:0.10}, {logp:-0.88, value:-0.35}],
+    3: [{logp:-1.55, value:0.20}, {logp:-1.02, value:0.50}, {logp:-0.72, value:0.75}],
+  };
+
+  const games = [0,1,2,3].map(g=>({
+    boards: [Array(9).fill("")],
+    step: 0,
+    done: false,
+    agentMark: g%2===0 ? "X" : "O",
+    decisions: [],
+    outcome: null,
+  }));
+
+  function checkWin(b){
+    const L = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+    for(const [i,j,k] of L){ if(b[i] && b[i]===b[j] && b[j]===b[k]) return b[i]; }
+    if(b.every(v=>v!=="")) return "draw";
+    return null;
+  }
+
+  let lastSpotlight = null;   // {boardBefore, chosenCell, logp, value}
+
+  function advance(){
+    let anyProgress = false;
+    games.forEach((g, gi)=>{
+      if(g.done) return;
+      const script = gameScripts[gi];
+      if(g.step >= script.length){ g.done = true; return; }
+      const [who, cell] = script[g.step];
+      const boardBefore = g.boards[g.boards.length-1];
+      const newBoard = boardBefore.slice();
+      newBoard[cell] = who;
+      g.boards.push(newBoard);
+      if(who === g.agentMark){
+        let logp, value;
+        if(gi === 0){
+          // game 1: exact match to MOVES
+          const mv = MOVES[g.decisions.length];
+          logp = mv.oldLogp; value = mv.value0;
+        } else {
+          const stat = FIXED_DECISION_STATS[gi][g.decisions.length];
+          logp = stat.logp; value = stat.value;
+        }
+        g.decisions.push({
+          moveNum: g.decisions.length+1, action: cell,
+          logp: logp.toFixed(3), value: value.toFixed(2),
+          boardBefore: boardBefore.slice(),
+        });
+        if(gi === 0){
+          lastSpotlight = { boardBefore: boardBefore.slice(), chosenCell: cell, logp, value };
+        }
+      }
+      g.step++;
+      const w = checkWin(newBoard);
+      if(w){
+        g.done = true;
+        g.outcome = w==="draw" ? 0 : (w===g.agentMark ? 1 : -1);
+        const T = g.decisions.length;
+        g.decisions.forEach((d,i)=>{ d.ret = (g.outcome * Math.pow(GAMMA, T-1-i)).toFixed(4); });
+      }
+      anyProgress = true;
+    });
+    render();
+    if(!anyProgress) document.getElementById("playAdvance").disabled = true;
+  }
+
+  function render(){
+    const mg = document.getElementById("miniGames");
+    mg.innerHTML = "";
+    games.forEach((g,gi)=>{
+      const cur = g.boards[g.boards.length-1];
+      let outcomeTxt = "";
+      if(g.done && g.outcome!==null) outcomeTxt = g.outcome===1 ? '<span style="color:var(--green)">WIN</span>' : g.outcome===-1 ? '<span style="color:var(--red)">LOSS</span>' : '<span style="color:var(--text-mid)">DRAW</span>';
+      else if(g.done) outcomeTxt = "-";
+      mg.innerHTML += `<div style="text-align:center;">
+        <div style="font-size:11px;color:var(--text-low);margin-bottom:4px;font-family:var(--mono);">game ${gi+1} · agent=${g.agentMark}${gi===0?' <span style="color:var(--gold)">★</span>':''}</div>
+        ${boardSVG(cur, 110)}
+        <div style="font-size:11px;margin-top:4px;color:var(--text-mid);">${g.decisions.length} decision${g.decisions.length===1?'':'s'} ${outcomeTxt}</div>
+      </div>`;
+    });
+
+    let total = 0; games.forEach(g=>{total += g.decisions.length;});
+    document.getElementById("bufSize").textContent = total;
+
+    const tbody = document.querySelector("#bufTable tbody");
+    tbody.innerHTML = "";
+    games.forEach((g,gi)=>{
+      g.decisions.forEach(d=>{
+        tbody.innerHTML += `<tr${gi===0?' style="background:rgba(43,179,172,.07);"':''}>
+          <td>game ${gi+1}${gi===0?' ★':''}</td>
+          <td>${d.moveNum}</td>
+          <td class="num">${d.action}</td>
+          <td class="num">${d.logp}</td>
+          <td class="num">${d.value}</td>
+          <td class="num" style="color:${d.ret===undefined?'var(--text-low)':(parseFloat(d.ret)>0?'var(--green)':parseFloat(d.ret)<0?'var(--red)':'var(--text-mid)')};">${d.ret===undefined?'—':d.ret}</td>
+        </tr>`;
+      });
+    });
+
+    // spotlight panel: show the worked equations for game 1's latest decision
+    if(lastSpotlight){
+      document.getElementById("spotlightCard").style.display = "";
+      renderSpotlight(document.getElementById("spotlightBody"), lastSpotlight);
+    }
+  }
+  render();
+
+  document.getElementById("playAdvance").onclick = advance;
+  document.getElementById("playReset").onclick = ()=>{
+    for(const g of games){ g.boards=[Array(9).fill("")]; g.step=0; g.done=false; g.decisions=[]; g.outcome=null; }
+    lastSpotlight = null;
+    document.getElementById("spotlightCard").style.display = "none";
+    document.getElementById("playAdvance").disabled=false;
+    render();
+  };
+}
+
+/* ---------- dimension-flow diagram (generic, symbolic) ---------- */
+function renderDimFlow(root){
+  const W = 900, H = 260;
+  const boxes = [
+    {x:10,  y:100, w:110, h:56, label:"prompt tokens", shape:"(B, L)", color:"#182740"},
+    {x:170, y:70,  w:150, h:116, label:"GPT-2\n12 transformer layers", shape:"", color:"#1D3049"},
+    {x:370, y:100, w:80,  h:56, label:"h", shape:"(B, 768)", color:"#2BB3AC", text:"#04211F"},
+  ];
+  const policyBoxes = [
+    {x:500, y:20,  w:150, h:52, label:"× action_rows.T", shape:"(768, 9)", color:"#182740"},
+    {x:690, y:20,  w:90,  h:52, label:"logits", shape:"(B, 9)", color:"#4E93D9", text:"#04152B"},
+    {x:500, y:90,  w:150, h:44, label:"mask + softmax", shape:"", color:"#182740"},
+    {x:690, y:88,  w:90,  h:48, label:"probs", shape:"(B, 9)", color:"#4E93D9", text:"#04152B"},
+    {x:820, y:20,  w:70,  h:52, label:"action", shape:"(B,)", color:"#F2B134", text:"#3A2600"},
+    {x:820, y:88,  w:70,  h:48, label:"logp", shape:"(B,)", color:"#F2B134", text:"#3A2600"},
+  ];
+  const valueBoxes = [
+    {x:500, y:170, w:130, h:44, label:"Linear+Tanh", shape:"(768→768)", color:"#182740"},
+    {x:650, y:170, w:130, h:44, label:"Linear", shape:"(768→1)", color:"#182740"},
+    {x:800, y:170, w:90,  h:44, label:"value", shape:"(B,)", color:"#9B87E0", text:"#1A1230"},
+  ];
+
+  function box(b){
+    const lines = b.label.split("\n");
+    let txt = lines.map((l,i)=>`<tspan x="${b.x+b.w/2}" dy="${i===0?0:13}">${l}</tspan>`).join("");
+    return `<rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" rx="8" fill="${b.color}" stroke="#33507A" stroke-width="1"/>
+      <text x="${b.x+b.w/2}" y="${b.y+b.h/2 - (lines.length>1?4:0) - (b.shape?7:0)}" text-anchor="middle"
+        font-family="ui-sans-serif" font-size="11.5" fill="${b.text||'#EAF1FA'}" font-weight="600">${txt}</text>
+      ${b.shape ? `<text x="${b.x+b.w/2}" y="${b.y+b.h/2+13}" text-anchor="middle" font-family="ui-monospace,monospace" font-size="11" fill="${b.text||'#9FB3CC'}">${b.shape}</text>` : ""}`;
+  }
+  function arrow(x1,y1,x2,y2,color="#3A5170"){
+    return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${color}" stroke-width="2" marker-end="url(#arrowhead)"/>`;
+  }
+
+  let html = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;min-height:220px;">
+    <defs><marker id="arrowhead" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 z" fill="#3A5170"/></marker></defs>`;
+
+  html += boxes.map(box).join("");
+  html += arrow(120,128,168,128);
+  html += arrow(320,128,368,128);
+
+  // h fans out to policy path (up) and value path (down)
+  html += arrow(410,100,410,46,"#2BB3AC") + arrow(410,46,498,46,"#2BB3AC");
+  html += arrow(410,156,410,192,"#9B87E0") + arrow(410,192,498,192,"#9B87E0");
+
+  html += policyBoxes.map(box).join("");
+  html += arrow(650,46,688,46);
+  html += arrow(575,72,575,90);
+  html += arrow(650,112,688,112);
+  html += arrow(780,46,818,46);
+  html += arrow(780,112,818,112);
+
+  html += valueBoxes.map(box).join("");
+  html += arrow(630,192,648,192);
+  html += arrow(780,192,798,192);
+
+  html += `<text x="500" y="12" font-family="ui-sans-serif" font-size="10.5" fill="#69809F">policy head (top) →</text>`;
+  html += `<text x="500" y="245" font-family="ui-sans-serif" font-size="10.5" fill="#69809F">value head (bottom) →</text>`;
+  html += `</svg>`;
+  root.innerHTML = html;
+}
+
+/* ---------- spotlight: worked equations for one real decision ---------- */
+function legalCellsOf(board){ return board.map((v,i)=>v===""?i:null).filter(x=>x!==null); }
+
+function buildIllustrativeLogits(board, chosenCell, targetLogp){
+  // Reverse-engineered so that softmax(logits)[chosenCell] == exp(targetLogp) EXACTLY.
+  // Other legal cells share the remaining probability equally (an illustrative choice —
+  // a real forward pass would not be uniform, but this keeps the example verifiable).
+  const legal = legalCellsOf(board);
+  const nLegal = legal.length;
+  const pStar = Math.exp(targetLogp);
+  const others = nLegal - 1;
+  const L = others > 0 ? Math.log((pStar / (1 - pStar)) * others) : 0;
+  return board.map((v, i) => {
+    if (v !== "") return -Infinity;
+    if (i === chosenCell) return L;
+    return 0;
+  });
+}
+function softmaxFromLogits(logits){
+  const finite = logits.filter(Number.isFinite);
+  const m = Math.max(...finite);
+  const exps = logits.map(x => Number.isFinite(x) ? Math.exp(x - m) : 0);
+  const s = exps.reduce((a,b)=>a+b, 0);
+  return exps.map(e => e / s);
+}
+
+function renderSpotlight(root, spot){
+  const { boardBefore, chosenCell, logp, value } = spot;
+  const legal = legalCellsOf(boardBefore);
+  const logits = buildIllustrativeLogits(boardBefore, chosenCell, logp);
+  const probs = softmaxFromLogits(logits);
+  const recomputedLogp = Math.log(probs[chosenCell]);
+
+  const barsHtml = probs.map((p,i)=>{
+    const legalHere = legal.includes(i);
+    const isChosen = i === chosenCell;
+    const h = Math.max(2, p * 160);
+    const color = isChosen ? "#F2B134" : legalHere ? "#2BB3AC" : "#24374F";
+    return `<div style="display:flex;flex-direction:column;align-items:center;width:11%;">
+      <div style="font-family:var(--mono);font-size:10px;color:${isChosen?'var(--gold)':'var(--text-low)'};margin-bottom:3px;">${legalHere?p.toFixed(3):'—'}</div>
+      <div style="width:60%;height:${h}px;background:${color};border-radius:2px 2px 0 0;"></div>
+      <div style="font-family:var(--mono);font-size:10.5px;color:var(--text-low);margin-top:4px;">${i}</div>
+    </div>`;
+  }).join("");
+
+  root.innerHTML = `
+    <div class="grid-2">
+      <div style="text-align:center;">
+        ${boardSVG(boardBefore, 150, {showNums:true, highlight:chosenCell})}
+        <div style="font-size:11.5px;color:var(--text-low);margin-top:8px;">board BEFORE this decision</div>
+      </div>
+      <div>
+        <div style="font-size:12px;color:var(--text-mid);margin-bottom:8px;">
+          <b>Step 1 — logits</b> (illustrative here; a real pass computes these via
+          <span class="mono">h @ action_rows.T</span>, shape <span class="mono">(9,)</span>).
+          Chosen cell <span class="mono" style="color:var(--gold);">${chosenCell}</span> is set so the
+          math below reproduces the recorded <span class="mono">logp = ${logp.toFixed(3)}</span> exactly.
+        </div>
+        <div style="font-size:12px;color:var(--text-mid);margin-bottom:4px;"><b>Step 2 — mask + softmax</b> → probabilities, shape <span class="mono">(9,)</span>:</div>
+        <div style="display:flex;align-items:flex-end;gap:2px;height:190px;margin:8px 0;">${barsHtml}</div>
+        <div class="note" style="margin-top:0;">grey = masked (illegal) · teal = legal · gold = sampled action</div>
+      </div>
+    </div>
+    <table class="grid" style="margin-top:14px;">
+      <tbody>
+        <tr><td>Step 3 — sample</td><td class="num">action = cell <b style="color:var(--gold)">${chosenCell}</b>, prob = <span class="mono">${probs[chosenCell].toFixed(4)}</span></td></tr>
+        <tr><td>Step 4 — logp = log(prob)</td><td class="num">log(${probs[chosenCell].toFixed(4)}) = <b class="mono" style="color:var(--teal);">${recomputedLogp.toFixed(4)}</b>
+          <span style="color:var(--text-low);font-size:11px;"> (recorded: ${logp.toFixed(4)}, diff ${Math.abs(recomputedLogp-logp).toExponential(1)})</span></td></tr>
+        <tr><td>value head output</td><td class="num"><b class="mono" style="color:var(--purple);">${value.toFixed(4)}</b> — from the SAME <span class="mono">h</span>, via the MLP below</td></tr>
+      </tbody>
+    </table>
+  `;
+}
+
+/* ---------- value-head numeric demo, D reduced to 6 ---------- */
+function renderValueMlpDemo(root){
+  const { z1_pre, z1, value } = toyForward(TOY_H);
+  function vecRow(v, dec=3){ return v.map(x=>x.toFixed(dec)).join(",  "); }
+
+  root.innerHTML = `
+    <table class="grid">
+      <tbody>
+        <tr><td style="width:220px;">h &nbsp;<span class="mono" style="color:var(--text-low);">(D=${TOY_D})</span></td>
+            <td class="num mono">[${vecRow(TOY_H)}]</td></tr>
+        <tr><td>z1_pre = h·W1 + b1</td>
+            <td class="num mono">[${vecRow(z1_pre)}]</td></tr>
+        <tr><td>z1 = tanh(z1_pre)</td>
+            <td class="num mono">[${vecRow(z1)}]</td></tr>
+        <tr><td>value = z1·W2 + b2</td>
+            <td class="num mono" style="color:var(--purple);font-weight:700;">${value.toFixed(4)}</td></tr>
+      </tbody>
+    </table>
+    <p class="note">
+      Real shapes: <span class="mono">W1: (768,768)</span>, <span class="mono">b1: (768,)</span>,
+      <span class="mono">W2: (768,1)</span>, <span class="mono">b2: (1,)</span> — 590,593 learned numbers total,
+      versus the ${TOY_D*TOY_D + TOY_D + TOY_D + 1} used here. The operations (matrix-vector multiply, add bias, tanh, multiply,
+      add bias) are identical; only the size differs.
+    </p>
+  `;
+}
+
+/* ============================================================================
+   STEP 5 — discount / return
+   ========================================================================= */
+function renderDiscount(root){
+  root.innerHTML = `
+    <div class="card">
+      <h3>the game ends. one number is handed out.</h3>
+      <div class="grid-3">
+        <div class="stat"><div class="sl">agent wins</div><div class="sv g">+1</div></div>
+        <div class="stat"><div class="sl">draw</div><div class="sv">0</div></div>
+        <div class="stat"><div class="sl">agent loses</div><div class="sv r">−1</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>share the outcome back over the model's decisions</h3>
+      <p style="font-size:13.5px;color:var(--text-mid);line-height:1.6;margin:0 0 12px;">
+        formula: <span class="mono" style="color:var(--gold)">ret = outcome × γ^(steps from end)</span> &nbsp;
+        with <span class="mono">γ = ${GAMMA}</span>
+      </p>
+      <table class="grid" id="discTable">
+        <thead><tr><th>move #</th><th>board after</th><th>steps from end</th><th>calculation</th><th style="text-align:right;">ret</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h3>what the shrinking does</h3>
+      <div class="grid-2">
+        <div>
+          <p style="font-size:13px;color:var(--text-mid);line-height:1.7;margin:0;">
+            The <b>last move</b> gets more credit than earlier ones because it is more responsible for the outcome —
+            when the model made its opening move, anything could still happen; when it played the winning cell, nothing else could.
+          </p>
+        </div>
+        <div>
+          <p style="font-size:13px;color:var(--text-mid);line-height:1.7;margin:0;">
+            <b>Side effect:</b> fast wins score higher than slow wins. A 3-move win gives the last move
+            <span class="mono" style="color:var(--gold)">${(1*Math.pow(GAMMA,0)).toFixed(4)}</span>; a 5-move win only
+            <span class="mono" style="color:var(--text-mid)">${(1*Math.pow(GAMMA,4)).toFixed(4)}</span> for the same last move counted from step 0.
+          </p>
+        </div>
+      </div>
+    </div>
+  `;
+
+  const tbody = document.querySelector("#discTable tbody");
+  const scenes = [
+    {board:["X","","","","O","",""," ",""], step:2, moveNum:1},
+    {board:["X","X","","","O","","","","O"], step:1, moveNum:2},
+    {board:["X","X","X","","O","","","","O"], step:0, moveNum:3, win:true},
+  ];
+  scenes.forEach(s=>{
+    const val = 1 * Math.pow(GAMMA, s.step);
+    tbody.innerHTML += `<tr class="${s.win?'emph':''}">
+      <td>${s.moveNum}</td>
+      <td>${boardSVG(s.board, 70)}</td>
+      <td class="num">${s.step}</td>
+      <td class="num">1 × ${GAMMA}<sup>${s.step}</sup></td>
+      <td class="num ${s.win?'win':''}">${val.toFixed(4)}</td>
+    </tr>`;
+  });
+}
+
+/* ============================================================================
+   STEP 6 — advantage
+   ========================================================================= */
+function renderAdvantage(root){
+  const adv = SIM.adv, advRaw = SIM.advRaw;
+  root.innerHTML = `
+    <div class="card">
+      <h3>subtract what the model expected</h3>
+      <p style="font-size:13.5px;color:var(--text-mid);line-height:1.6;margin:0 0 14px;">
+        The value head guesses "how well will this go for me?" for every board. The gap between what
+        actually happened and what it guessed is the <b>advantage</b> — that is what training reacts to.
+      </p>
+      <table class="grid">
+        <thead><tr><th>move</th><th class="num">return</th><th class="num">value (guess)</th><th class="num">raw adv = ret − value</th><th class="num">normalized</th></tr></thead>
+        <tbody>
+          ${MOVES.map((m,i)=>`<tr>
+            <td>${m.label}</td>
+            <td class="num">${RETS[i].toFixed(4)}</td>
+            <td class="num">${VALUES0[i].toFixed(2)}</td>
+            <td class="num">${sgn(advRaw[i],4)}</td>
+            <td class="num" style="color:${adv[i]>0?'var(--green)':'var(--red)'};font-weight:700;">${sgn(adv[i],4)}</td>
+          </tr>`).join("")}
+        </tbody>
+      </table>
+      <p class="note">
+        Normalization: subtract the mean (<span class="mono">${mean(advRaw).toFixed(4)}</span>) and divide by the std
+        (<span class="mono">${sampleStd(advRaw).toFixed(4)}</span>). This keeps advantage on a consistent scale across batches.
+      </p>
+    </div>
+
+    <div class="card">
+      <h3>read the results</h3>
+      <div class="grid-3">
+        <div class="stat"><div class="sl">${MOVES[0].label} — biggest surprise</div><div class="sv g">${sgn(adv[0],3)}</div><div class="sn">critic gave move 1 almost no credit (0.10), but it led to a near-perfect outcome (0.96). Reinforce.</div></div>
+        <div class="stat"><div class="sl">${MOVES[1].label} — near expected</div><div class="sv">${sgn(adv[1],3)}</div><div class="sn">critic guessed 0.55, got 0.98. Not far from average surprise → barely moves.</div></div>
+        <div class="stat"><div class="sl">${MOVES[2].label} — no surprise</div><div class="sv r">${sgn(adv[2],3)}</div><div class="sn">critic already said 0.90; actually winning barely beats that. Nothing new to learn — even discourages a tiny bit vs. batch average.</div></div>
+      </div>
+    </div>
+  `;
+}
+
+/* ============================================================================
+   STEP 7 — PPO update (stepper across epochs, mini-version of prior viz)
+   ========================================================================= */
+function renderPPOUpdate(root){
+  root.innerHTML = `
+    <div class="card">
+      <h3>use the same 3 examples for 4 training passes</h3>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;">
+        <span style="font-size:12px;color:var(--text-mid);">move:</span>
+        <span id="moveBtns" style="display:inline-flex;gap:4px;"></span>
+        <span style="font-size:12px;color:var(--text-mid);margin-left:14px;">pass:</span>
+        <span id="epochBtns" style="display:inline-flex;gap:4px;"></span>
+        <button class="action" id="ppoPlay" style="margin-left:auto;">▶ play through passes</button>
+      </div>
+
+      <div style="font-size:12px;color:var(--text-mid);margin-bottom:6px;">
+        ratio =
+        <span class="mono" id="ratioText" style="color:var(--teal);font-weight:700;">1.0000</span>
+        &nbsp;→ if it leaves [0.8, 1.2], the clip engages and this term's gradient becomes flat.
+      </div>
+      <div class="gauge-track">
+        <div class="gauge-band" id="ppoBand"></div>
+        <div class="gauge-marker" id="ppoMarker"></div>
+      </div>
+      <div class="gauge-ticks"><span>0.5</span><span>0.8</span><span>1.0</span><span>1.2</span><span>1.6</span></div>
+      <div id="clipStatus" style="font-size:12px;margin-top:8px;color:var(--text-mid);"></div>
+    </div>
+
+    <div class="card">
+      <h3>live values, for this move at this pass</h3>
+      <table class="grid" id="ppoTable">
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div class="grid-3">
+      <div class="stat"><div class="sl">pg term (across 3 moves)</div><div class="sv" id="statPg">—</div></div>
+      <div class="stat"><div class="sl">0.5 × vloss</div><div class="sv gold" id="statVloss">—</div></div>
+      <div class="stat"><div class="sl">total loss</div><div class="sv" id="statTotal">—</div></div>
+    </div>
+
+    <div class="card" style="margin-top:16px;">
+      <h3>watch the gradient flow backward, after <span class="mono">loss.backward()</span></h3>
+      <p style="font-size:12.5px;color:var(--text-mid);line-height:1.6;margin:0 0 14px;">
+        Left: the <b>policy path</b>, for whichever move/pass is selected above (numbers change with your selection).
+        Right: the <b>value path</b>, a fixed worked example (<span class="mono">ret = ${TOY_RET.toFixed(4)}</span>,
+        the D=6 stand-in from Step 4) — both were verified against finite differences before being shown here.
+        Both paths run in the same <span class="mono">.backward()</span> call and their gradients merge at
+        <span class="mono">h</span>.
+      </p>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:14px;">
+        <span id="backStageBtns" style="display:inline-flex;gap:4px;flex-wrap:wrap;"></span>
+        <button class="action" id="backPlay" style="margin-left:auto;">▶ play backward</button>
+      </div>
+      <div id="backGraph" style="overflow-x:auto;margin-bottom:14px;"></div>
+      <div style="font-size:11px;color:var(--text-low);margin-bottom:10px;">
+        <span style="color:var(--blue);">●</span> policy path &nbsp;
+        <span style="color:var(--purple);">●</span> value path &nbsp;
+        <span style="color:#3A5170;">●</span> not yet reached &nbsp;·&nbsp;
+        edge labels = local derivative &nbsp;·&nbsp; node labels = accumulated <span class="mono">d(loss)/d(node)</span>
+      </div>
+      <div class="grid-2">
+        <div>
+          <div style="font-size:11px;color:var(--blue);font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:.03em;">policy path — exact values</div>
+          <div id="backPolicyBody" style="font-size:12px;line-height:1.8;color:var(--text-hi);"></div>
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--purple);font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:.03em;">value path — exact values</div>
+          <div id="backValueBody" style="font-size:12px;line-height:1.8;color:var(--text-hi);"></div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  let activeMove = 0, epoch = 0;
+  let backStep = 0;
+  let playing = false, timer = null;
+  let backPlaying = false, backTimer = null;
+
+  const BACK_STAGE_LABELS = ["1 · at the loss", "2 · last layer", "3 · nonlinearity", "4 · into h", "5 · merge → GPT-2"];
+  const backStageBtns = document.getElementById("backStageBtns");
+  BACK_STAGE_LABELS.forEach((label,i)=>{
+    const b = document.createElement("button");
+    b.className = "ghost"; b.textContent = label; b.style.padding="4px 10px"; b.style.fontSize="11px";
+    b.onclick = ()=>{ backStep=i; stopBackPlay(); render(); };
+    backStageBtns.appendChild(b);
+  });
+  function stopBackPlay(){ backPlaying=false; if(backTimer){clearInterval(backTimer); backTimer=null;} document.getElementById("backPlay").textContent="▶ play backward"; }
+  document.getElementById("backPlay").onclick = ()=>{
+    if(backPlaying){ stopBackPlay(); return; }
+    if(backStep>=BACK_STAGE_LABELS.length-1) backStep=0;
+    backPlaying=true; document.getElementById("backPlay").textContent="⏸ pause";
+    backTimer=setInterval(()=>{
+      backStep++;
+      if(backStep>BACK_STAGE_LABELS.length-1){ stopBackPlay(); return; }
+      render();
+    }, 1100);
+    render();
+  };
+
+  const moveBtns = document.getElementById("moveBtns");
+  MOVES.forEach((m,i)=>{
+    const b = document.createElement("button");
+    b.className = "ghost"; b.textContent = m.label; b.style.padding="4px 10px"; b.style.fontSize="11.5px";
+    b.onclick = ()=>{ activeMove=i; render(); };
+    moveBtns.appendChild(b);
+  });
+  const epochBtns = document.getElementById("epochBtns");
+  for(let e=0;e<=EPOCHS;e++){
+    const b = document.createElement("button");
+    b.className = "ghost"; b.textContent = e; b.style.padding="4px 10px"; b.style.fontSize="11.5px";b.style.minWidth="30px";
+    b.onclick = ()=>{ epoch=e; stopPlay(); render(); };
+    epochBtns.appendChild(b);
+  }
+  function stopPlay(){ playing=false; if(timer){clearInterval(timer); timer=null;} document.getElementById("ppoPlay").textContent="▶ play through passes"; }
+  document.getElementById("ppoPlay").onclick = ()=>{
+    if(playing){ stopPlay(); return; }
+    if(epoch>=EPOCHS) epoch=0;
+    playing=true; document.getElementById("ppoPlay").textContent="⏸ pause";
+    timer=setInterval(()=>{
+      epoch++;
+      if(epoch>EPOCHS){ stopPlay(); return; }
+      render();
+    }, 900);
+    render();
+  };
+
+  function render(){
+    moveBtns.querySelectorAll("button").forEach((b,i)=>{ b.style.borderColor = i===activeMove ? "var(--teal)" : ""; b.style.color = i===activeMove ? "var(--text-hi)" : ""; });
+    epochBtns.querySelectorAll("button").forEach((b,i)=>{ b.style.borderColor = i===epoch ? "var(--teal)" : ""; b.style.color = i===epoch ? "var(--text-hi)" : ""; });
+
+    const t = termsAt(SIM, OLD_LOGP, RETS, epoch, activeMove);
+
+    // gauge
+    const lo=0.5, hi=1.6;
+    const pct = x => (Math.max(lo,Math.min(hi,x))-lo)/(hi-lo)*100;
+    document.getElementById("ppoBand").style.left = pct(0.8)+"%";
+    document.getElementById("ppoBand").style.width = (pct(1.2)-pct(0.8))+"%";
+    const mk = document.getElementById("ppoMarker");
+    mk.style.left = `calc(${pct(t.ratio)}% - 1.5px)`;
+    mk.classList.toggle("clip", t.clipBinding);
+    document.getElementById("ratioText").textContent = t.ratio.toFixed(4);
+    document.getElementById("ratioText").style.color = t.clipBinding ? "var(--red)" : "var(--teal)";
+    document.getElementById("clipStatus").innerHTML = t.clipBinding
+      ? `<span style="color:var(--red);font-weight:700;">⬤ clip binding</span> — the gradient for this term is flat; ratio will not move further this iteration.`
+      : `<span style="color:var(--green);">inside trusted region</span>`;
+
+    // table
+    const tbody = document.querySelector("#ppoTable tbody");
+    tbody.innerHTML = `
+      <tr><td>old_logp (frozen)</td><td class="num">${OLD_LOGP[activeMove].toFixed(4)}</td></tr>
+      <tr><td>logp (this pass)</td><td class="num">${t.lp.toFixed(4)}${epoch===0?' <span style="color:var(--text-low);font-size:11px;">= old_logp</span>':''}</td></tr>
+      <tr><td>ratio = exp(logp − old_logp)</td><td class="num" style="color:${t.clipBinding?'var(--red)':'var(--teal)'};font-weight:700;">${t.ratio.toFixed(4)}</td></tr>
+      <tr><td>advantage (normalized)</td><td class="num" style="color:${SIM.adv[activeMove]>0?'var(--green)':'var(--red)'};">${sgn(SIM.adv[activeMove])}</td></tr>
+      <tr><td>ratio × adv</td><td class="num">${sgn(t.unclip)}</td></tr>
+      <tr><td>clip(ratio) × adv</td><td class="num">${sgn(t.clipT)}</td></tr>
+      <tr><td>pg = −min(...)</td><td class="num" style="color:${t.pgTerm<0?'var(--green)':'var(--red)'};font-weight:700;">${sgn(t.pgTerm)}</td></tr>
+      <tr><td>value head guess</td><td class="num">${t.v.toFixed(4)}</td></tr>
+      <tr><td>vloss = (ret − value)²</td><td class="num">${t.vlossTerm.toFixed(4)}</td></tr>
+    `;
+
+    // aggregate
+    let pgSum=0, vlSum=0;
+    for(let i=0;i<3;i++){ const s = termsAt(SIM, OLD_LOGP, RETS, epoch, i); pgSum+=s.pgTerm; vlSum+=s.vlossTerm; }
+    const pgMean = pgSum/3, vlMean = vlSum/3;
+    const total = pgMean + VF_COEF*vlMean - ENT_COEF*ENTROPY_TOY[epoch];
+    const pgEl = document.getElementById("statPg"); pgEl.textContent = sgn(pgMean); pgEl.className = "sv "+(pgMean<0?"g":"r");
+    document.getElementById("statVloss").textContent = sgn(VF_COEF*vlMean);
+    const totEl = document.getElementById("statTotal"); totEl.textContent = sgn(total); totEl.className = "sv "+(total<0?"g":"r");
+
+    // backward-pass visualization
+    backStageBtns.querySelectorAll("button").forEach((b,i)=>{ b.style.borderColor = i===backStep ? "var(--teal)" : ""; b.style.color = i===backStep ? "var(--text-hi)" : ""; });
+    renderBackward(activeMove, epoch, backStep, t, SIM.adv[activeMove]);
+  }
+  render();
+  window._ppoState = {
+    get activeMove(){return activeMove;}, set activeMove(v){activeMove=v;},
+    get epoch(){return epoch;}, set epoch(v){epoch=v;},
+    get backStep(){return backStep;}, set backStep(v){backStep=v;},
+    render,
+  };
+}
+
+/* ---------- backward-pass content, policy path (dynamic) + value path (fixed) ---------- */
+function normOf(arr){ return Math.sqrt(arr.reduce((s,x)=>s+x*x,0)); }
+
+function renderBackward(activeMove, epoch, stage, t, adv){
+  const moveObj = MOVES[activeMove];
+  const dPgRatio = t.clipBinding ? 0 : -adv;
+  const dPgNewLogp = dPgRatio * t.ratio;
+  const logits = buildIllustrativeLogits(moveObj.board, moveObj.cell, t.lp);
+  const probs = softmaxFromLogits(logits);
+  const legal = legalCellsOf(moveObj.board);
+  const dPgLogits = logits.map((_,i) => legal.includes(i) ? dPgNewLogp * ((i===moveObj.cell?1:0) - probs[i]) : null);
+  const dPgLogitsFinite = dPgLogits.filter(v => v !== null);
+  const vecStr = arr => arr.map(v => v===null ? "—" : v.toFixed(4)).join(", ");
+
+  const tb = toyBackward(TOY_H, TOY_RET);
+  const dLossVloss = 0.5;
+  const dLossValue = 0.5 * tb.dValue;
+  const dLossZ1 = tb.dZ1.map(x => 0.5*x);
+  const dLossZ1pre = tb.dZ1pre.map(x => 0.5*x);
+  const dLossH_value = tb.dH.map(x => 0.5*x);
+  const vecStr2 = arr => arr.map(v => v.toFixed(4)).join(", ");
+
+  /* ---------- draw the computational graph ---------- */
+  drawBackGraph(document.getElementById("backGraph"), stage, {
+    dPgRatio, dPgNewLogp, ratio: t.ratio, clipBinding: t.clipBinding,
+    logitsGradNorm: normOf(dPgLogitsFinite),
+  }, {
+    dLossVloss, dLossValue, z1Norm: normOf(dLossZ1), z1preNorm: normOf(dLossZ1pre), hNorm: normOf(dLossH_value),
+  });
+
+  /* ---------- compact text readout, exact numbers ---------- */
+  let policyHtml = "";
+  if (stage === 0) {
+    policyHtml = `<b>d(loss)/d(pg) = 1</b><div class="note" style="margin-top:2px;">this example's share of the loss, before averaging over the batch</div>`;
+  } else if (stage === 1) {
+    policyHtml = `
+      d(pg)/d(ratio) = ${t.clipBinding ? `<span style="color:var(--red);">0</span> (clip binding)` : `−adv = <span class="mono">${(-adv).toFixed(4)}</span>`}<br>
+      d(ratio)/d(new_logp) = ratio = <span class="mono">${t.ratio.toFixed(4)}</span><br>
+      <b>d(loss)/d(new_logp) = <span class="mono" style="color:${dPgNewLogp===0?'var(--red)':'var(--teal)'};">${dPgNewLogp.toFixed(4)}</span></b>`;
+  } else if (stage === 2) {
+    policyHtml = `
+      d(new_logp)/d(logits[i]) = 1[i=chosen] − probs[i]<br>
+      <b>d(loss)/d(logits)</b> = <span class="mono" style="font-size:11px;">[${vecStr(dPgLogits)}]</span>
+      ${dPgNewLogp===0 ? '<div class="note" style="margin-top:2px;color:var(--red);">all zero — clip already killed it upstream</div>' : ''}`;
+  } else if (stage === 3) {
+    policyHtml = `
+      d(loss)/d(h)<sub>policy</sub> = Σᵢ d(loss)/d(logits[i]) × action_rows[i]<br>
+      <span class="note" style="margin-top:2px;">a <span class="mono">(768,)</span> vector — real <span class="mono">action_rows</span> not shown here</span>`;
+  } else {
+    policyHtml = `<b>arrives at h</b>, ready to add with the value path →`;
+  }
+
+  let valueHtml = "";
+  if (stage === 0) {
+    valueHtml = `<b>d(loss)/d(vloss) = 0.5</b><div class="note" style="margin-top:2px;">the <span class="mono">vf_coef</span> weight</div>`;
+  } else if (stage === 1) {
+    valueHtml = `
+      d(vloss)/d(value) = 2(value−ret) = <span class="mono">${tb.dValue.toFixed(4)}</span><br>
+      <b>d(loss)/d(value) = <span class="mono" style="color:var(--purple);">${dLossValue.toFixed(4)}</span></b><br>
+      d(loss)/d(z1) = <span class="mono" style="font-size:11px;">[${vecStr2(dLossZ1)}]</span>`;
+  } else if (stage === 2) {
+    valueHtml = `
+      d(z1)/d(z1_pre) = 1 − z1²  (tanh')<br>
+      <b>d(loss)/d(z1_pre)</b> = <span class="mono" style="font-size:11px;">[${vecStr2(dLossZ1pre)}]</span>`;
+  } else if (stage === 3) {
+    valueHtml = `
+      d(z1_pre)/d(h) = W1ᵀ (6×6, not shown in full)<br>
+      <b>d(loss)/d(h)</b><sub>value</sub> = <span class="mono" style="font-size:11px;">[${vecStr2(dLossH_value)}]</span><br>
+      <span class="note">this vector is what continues into GPT-2's 12 layers</span>`;
+  } else {
+    valueHtml = `<b>arrives at h</b>, adds with the policy path:<br>
+      <span class="mono" style="font-size:12px;">d(loss)/d(h) = d(loss)/d(h)<sub>policy</sub> + d(loss)/d(h)<sub>value</sub></span><br>
+      <span class="note" style="margin-top:4px;">then this combined gradient backpropagates through all 12 GPT-2 layers, one identical chain-rule step at a time — too many to show here, but no different in kind from what you just watched.</span>`;
+  }
+
+  document.getElementById("backPolicyBody").innerHTML = policyHtml;
+  document.getElementById("backValueBody").innerHTML = valueHtml;
+}
+
+/* ---------- the graph itself: nodes + forward (grey) edges + backward (colored, cumulative) edges ---------- */
+function drawBackGraph(root, stage, pol, val){
+  const W = 900, H = 260;
+  const N = {
+    h:      {x:20,  y:100, w:64, h:60, label:"h"},
+    logits: {x:150, y:24,  w:92, h:46, label:"logits"},
+    nlogp:  {x:290, y:24,  w:92, h:46, label:"new_logp"},
+    ratio:  {x:430, y:24,  w:80, h:46, label:"ratio"},
+    pg:     {x:560, y:24,  w:64, h:46, label:"pg"},
+    z1pre:  {x:150, y:190, w:92, h:46, label:"z1_pre"},
+    z1:     {x:290, y:190, w:80, h:46, label:"z1"},
+    value:  {x:420, y:190, w:80, h:46, label:"value"},
+    vloss:  {x:550, y:190, w:74, h:46, label:"vloss"},
+    loss:   {x:700, y:100, w:80, h:60, label:"loss"},
+  };
+  const cx = n => n.x + n.w/2, cy = n => n.y + n.h/2;
+
+  // forward-direction edges, each tagged with the backward-stage it "belongs to"
+  // (an edge is highlighted once stage >= its tag, i.e. cumulative from loss back to h)
+  const EDGES = [
+    { a:"pg",     b:"loss",  tag:0, path:"policy" },
+    { a:"ratio",  b:"pg",    tag:1, path:"policy" },
+    { a:"nlogp",  b:"ratio", tag:1, path:"policy" },
+    { a:"logits", b:"nlogp", tag:2, path:"policy" },
+    { a:"h",      b:"logits",tag:3, path:"policy" },
+    { a:"vloss",  b:"loss",  tag:0, path:"value" },
+    { a:"value",  b:"vloss", tag:1, path:"value" },
+    { a:"z1",     b:"value", tag:1, path:"value" },
+    { a:"z1pre",  b:"z1",    tag:2, path:"value" },
+    { a:"h",      b:"z1pre", tag:3, path:"value" },
+  ];
+
+  const COLOR = { policy:"#4E93D9", value:"#9B87E0", inactive:"#3A5170" };
+
+  function box(id, n, active){
+    const fill = active ? (id==="h"||id==="loss" ? "#1D3049" : "#16273F") : "#121D2E";
+    const stroke = active ? "#4C6688" : "#22344C";
+    const textColor = active ? "#EAF1FA" : "#5B6B7C";
+    return `<rect x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" rx="8" fill="${fill}" stroke="${stroke}" stroke-width="1.5"/>
+      <text x="${cx(n)}" y="${cy(n)+4}" text-anchor="middle" font-family="ui-monospace,monospace" font-size="12" fill="${textColor}" font-weight="600">${n.label}</text>`;
+  }
+
+  function edgePath(e, activeNow, color){
+    const a = N[e.a], b = N[e.b];
+    const x1 = a.x + a.w, y1 = cy(a), x2 = b.x, y2 = cy(b);
+    // curved connector when rows differ (into/out of h or loss), straight otherwise
+    const sameRow = Math.abs(y1-y2) < 1;
+    const d = sameRow
+      ? `M${x1},${y1} L${x2},${y2}`
+      : `M${x1},${y1} C${x1+50},${y1} ${x2-50},${y2} ${x2},${y2}`;
+    const strokeColor = activeNow ? color : COLOR.inactive;
+    const width = activeNow ? 2.5 : 1.5;
+    const markerId = activeNow ? (e.path==="policy" ? "arrBackPolicy" : "arrBackValue") : "arrGrey";
+    return `<path class="edge-path" d="${d}" fill="none" stroke="${strokeColor}" stroke-width="${width}" marker-start="url(#${markerId})" ${activeNow?'':'stroke-dasharray="3 3"'}/>`;
+  }
+
+  // which nodes are "reached" (have an accumulated gradient) at this stage
+  const reachedByStage = [
+    ["pg","vloss"],                              // stage 0
+    ["pg","vloss","ratio","value","z1"],         // stage 1 (cumulative)
+    ["pg","vloss","ratio","value","z1","nlogp","z1pre"],       // stage 2
+    ["pg","vloss","ratio","value","z1","nlogp","z1pre","logits"], // stage 3
+    ["pg","vloss","ratio","value","z1","nlogp","z1pre","logits","h"], // stage 4
+  ];
+  const reached = new Set(["loss", ...reachedByStage[stage]]);
+
+  let html = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;min-height:230px;">
+    <defs>
+      <marker id="arrGrey" markerWidth="7" markerHeight="7" refX="1" refY="3.5" orient="auto"><path d="M7,0 L0,3.5 L7,7 z" fill="#3A5170"/></marker>
+      <marker id="arrBackPolicy" markerWidth="8" markerHeight="8" refX="1" refY="4" orient="auto"><path d="M8,0 L0,4 L8,8 z" fill="${COLOR.policy}"/></marker>
+      <marker id="arrBackValue" markerWidth="8" markerHeight="8" refX="1" refY="4" orient="auto"><path d="M8,0 L0,4 L8,8 z" fill="${COLOR.value}"/></marker>
+    </defs>`;
+
+  // edges first (so nodes draw on top)
+  for(const e of EDGES){
+    const active = stage >= e.tag;
+    html += edgePath(e, active, COLOR[e.path]);
+  }
+  // nodes
+  for(const id of Object.keys(N)){
+    html += box(id, N[id], reached.has(id));
+  }
+  // node value labels (accumulated gradient), shown once reached
+  const labelFor = {
+    pg: "1", vloss: "0.5",
+    ratio: pol.dPgRatio.toFixed(3), value: val.dLossValue.toFixed(3),
+    nlogp: pol.dPgNewLogp.toFixed(3), z1: `‖·‖=${val.z1Norm.toFixed(3)}`,
+    z1pre: `‖·‖=${val.z1preNorm.toFixed(3)}`, logits: `‖·‖=${pol.logitsGradNorm.toFixed(3)}`,
+    h: `‖·‖=${val.hNorm.toFixed(3)} (value) + policy`,
+  };
+  for(const id of Object.keys(labelFor)){
+    if(!reached.has(id)) continue;
+    const n = N[id];
+    const isPolicy = ["ratio","nlogp","logits"].includes(id);
+    const color = id==="h" ? "#F2B134" : (isPolicy ? COLOR.policy : COLOR.value);
+    html += `<text x="${cx(n)}" y="${n.y - 8}" text-anchor="middle" font-family="ui-monospace,monospace" font-size="10.5" fill="${color}" font-weight="700">${labelFor[id]}</text>`;
+  }
+  if(stage===4){
+    html += `<circle cx="${cx(N.h)}" cy="${N.h.y+N.h.h+14}" r="0" />`;
+    html += `<text x="${cx(N.h)}" y="${N.h.y+N.h.h+16}" text-anchor="middle" font-family="ui-sans-serif" font-size="10" fill="var(--gold)">merged →</text>`;
+  }
+  html += `<text x="20" y="14" font-family="ui-sans-serif" font-size="10" fill="#69809F">policy path (top)</text>`;
+  html += `<text x="20" y="253" font-family="ui-sans-serif" font-size="10" fill="#69809F">value path (bottom)</text>`;
+  html += `</svg>`;
+  root.innerHTML = html;
+}
+
+/* ============================================================================
+   STEP 8 — discard
+   ========================================================================= */
+function renderDiscard(root){
+  root.innerHTML = `
+    <div class="card">
+      <h3>the buffer, freshly written</h3>
+      <div id="bufBox"></div>
+      <div style="margin-top:14px;display:flex;gap:10px;">
+        <button class="action" id="discardBtn">discard</button>
+        <button class="ghost" id="restoreBtn">restore</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>why: the games no longer describe the current model</h3>
+      <p style="font-size:13.5px;color:var(--text-mid);line-height:1.7;margin:0 0 10px;">
+        After 4 update passes, the weights have moved. Those <span class="mono">logp</span> values in the buffer
+        describe a policy that <b>no longer exists</b>. If you kept training on them, the ratio would keep drifting
+        past 1.2 forever — the clip would fire on every example — and the update would become uninformative.
+      </p>
+      <p class="note">
+        This is the <b>on-policy</b> constraint that comes with PPO. Off-policy methods (Q-learning, SAC) can keep
+        a replay buffer forever; PPO cannot. It's not wasteful design — it's a structural requirement of the algorithm.
+      </p>
+    </div>
+
+    <div class="card">
+      <h3>then: back to Step 4</h3>
+      <p style="font-size:13.5px;color:var(--text-mid);line-height:1.7;margin:0;">
+        Play <b>128 fresh games</b> with the updated model, build a new buffer, run 4 more passes. Repeat 150 times.
+        Total across the run: ~<b>19,200 games played</b>, ~<b>65,000 training examples generated and thrown away</b>.
+      </p>
+    </div>
+  `;
+
+  const buf = document.getElementById("bufBox");
+  let discarded = false;
+  function draw(){
+    buf.innerHTML = "";
+    for(let g=0;g<4;g++){
+      for(let m=0;m<3;m++){
+        const chip = document.createElement("span");
+        chip.className = "buffer-tag" + (discarded ? " stale" : "");
+        chip.textContent = `game ${g+1}, move ${m+1}`;
+        buf.appendChild(chip);
+      }
+    }
+  }
+  draw();
+  document.getElementById("discardBtn").onclick = ()=>{ discarded=true; draw(); };
+  document.getElementById("restoreBtn").onclick = ()=>{ discarded=false; draw(); };
+}
+
+/* ============================================================================
+   STEP 9 — training curves
+   ========================================================================= */
+function renderCurves(root){
+  root.innerHTML = `
+    <div class="card">
+      <h3>150 PPO iterations, tracked</h3>
+      <svg class="curves-svg" id="curveSvg" viewBox="0 0 900 260"></svg>
+      <div class="legend">
+        <span><i style="background:#E25B58"></i>loss rate vs random opponent</span>
+        <span><i style="background:#3FB579"></i>win rate vs random opponent</span>
+        <span><i style="background:#4E93D9"></i>top-1 correct move (all 4,520 positions)</span>
+        <span><i style="background:#9B87E0"></i>opponent randomness (annealed)</span>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="card">
+        <h3>the story the numbers tell</h3>
+        <p style="font-size:13px;color:var(--text-mid);line-height:1.7;margin:0 0 10px;">
+          Loss rate drops <b>${(0.425).toFixed(3)} → ${(0.09).toFixed(3)}</b>, a 4.7× reduction. Win rate rises
+          <b>${(0.575).toFixed(3)} → ${(0.795).toFixed(3)}</b>. The purple dashed line shows the opponent getting
+          harder in step — <b>the flat mean reward is real progress against rising difficulty</b>, not stagnation.
+        </p>
+      </div>
+
+      <div class="card">
+        <h3>reference points (exact, from the game tree)</h3>
+        <div class="stat" style="margin-bottom:8px;"><div class="sl">random player vs random opponent</div><div class="sv">W ${REF_RANDOM.win.toFixed(3)} · D ${REF_RANDOM.draw.toFixed(3)} · L ${REF_RANDOM.loss.toFixed(3)}</div></div>
+        <div class="stat"><div class="sl">perfect player vs random opponent</div><div class="sv g">W ${REF_PERFECT.win.toFixed(3)} · D ${REF_PERFECT.draw.toFixed(3)} · L ${REF_PERFECT.loss.toFixed(3)}</div></div>
+        <p class="note">Perfect play <b>never loses</b> — that's what makes 0.09 loss rate the meaningful measurement.</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>chance baselines, so you can interpret "top-1"</h3>
+      <div class="grid-2">
+        <div class="stat"><div class="sl">top-1 by random guessing (over all 4,520 positions)</div><div class="sv">${CHANCE_TOP1.toFixed(3)}</div></div>
+        <div class="stat"><div class="sl">blunder rate by random guessing</div><div class="sv">${CHANCE_BLUNDER.toFixed(3)}</div></div>
+      </div>
+    </div>
+  `;
+
+  const svg = document.getElementById("curveSvg");
+  const W=900, H=260, padL=45, padR=22, padT=16, padB=32;
+  const xs = t => padL + (W-padL-padR)*t;
+  const ys = v => padT + (H-padT-padB)*(1-v);
+  let html = "";
+  for(let v=0;v<=1;v+=0.2){
+    html += `<line x1="${padL}" y1="${ys(v)}" x2="${W-padR}" y2="${ys(v)}" style="stroke:var(--grid-line);" stroke-width="1"/>`;
+    html += `<text x="${padL-8}" y="${ys(v)+4}" font-family="ui-monospace" font-size="10.5" style="fill:var(--text-low);" text-anchor="end">${v.toFixed(1)}</text>`;
+  }
+  for(let i=0;i<=4;i++){
+    const t = i/4;
+    html += `<text x="${xs(t)}" y="${H-10}" font-family="ui-monospace" font-size="10.5" style="fill:var(--text-low);" text-anchor="middle">iter ${Math.round(t*150)}</text>`;
+  }
+  function line(key, color, dashed){
+    const d = CURVES.map((c,i)=>(i===0?"M":"L")+xs(c.t).toFixed(1)+" "+ys(c[key]).toFixed(1)).join(" ");
+    return `<path d="${d}" fill="none" stroke="${color}" stroke-width="2.2" ${dashed?'stroke-dasharray="5 4"':''}/>`;
+  }
+  html += `<line x1="${padL}" y1="${ys(REF_PERFECT.loss)}" x2="${W-padR}" y2="${ys(REF_PERFECT.loss)}" style="stroke:var(--green);" stroke-width="1" stroke-dasharray="2 4" opacity=".5"/>`;
+  html += `<text x="${W-padR-4}" y="${ys(REF_PERFECT.loss)-4}" font-family="ui-monospace" font-size="10" style="fill:var(--green);" text-anchor="end">perfect: 0 losses</text>`;
+  html += line("loss", "#E25B58");
+  html += line("win", "#3FB579");
+  html += line("top1", "#4E93D9");
+  html += line("p_rand", "#9B87E0", true);
+  svg.innerHTML = html;
+}
+
+/* ============================================================================
+   STEP 10 — predicting after training (forward pass only, value head unused)
+   ========================================================================= */
+function renderPredict(root){
+  root.innerHTML = `
+    <div class="card">
+      <h3>the forward pass is identical — only what happens NEXT differs</h3>
+      <p style="font-size:13px;color:var(--text-mid);line-height:1.7;margin:0 0 12px;">
+        <span class="mono">policy(ids, attn, pos, legal)</span> still returns both
+        <span class="mono">logits</span> and <span class="mono">value</span> — the code doesn't know training
+        is over. But the caller now only reads the probabilities.
+      </p>
+      <div id="predictFlow" style="overflow-x:auto;"></div>
+    </div>
+
+    <div class="card">
+      <h3>worked example — an empty board, from a real trained checkpoint</h3>
+      <p style="font-size:12.5px;color:var(--text-mid);line-height:1.6;margin:0 0 12px;">
+        These are the actual numbers one trained run produced (reported earlier in this conversation),
+        not an invented illustration.
+      </p>
+      <div class="grid-2">
+        <div style="text-align:center;">
+          ${boardSVG(["","","","","","","","",""], 150, {showNums:true, highlight:0})}
+          <div style="font-size:11.5px;color:var(--text-low);margin-top:8px;">empty board, X to move</div>
+        </div>
+        <div>
+          <table class="grid">
+            <tbody>
+              <tr><td>value head output</td><td class="num mono" style="color:var(--purple);">+0.481</td></tr>
+              <tr><td colspan="2" style="padding-top:10px;"><i>probabilities (from softmax over logits):</i></td></tr>
+            </tbody>
+          </table>
+          <div id="predictBars" style="display:flex;align-items:flex-end;gap:3px;height:150px;margin:10px 0;"></div>
+        </div>
+      </div>
+      <p class="note">
+        <b>cell 0: 0.997</b> — every other legal cell is ≈0.000. On an empty board every cell is tied-optimal
+        under perfect play, so this isn't wrong — but 99.7% confidence on a position with no wrong answer is a
+        sign of a leftover positional habit, not evidence of tactical understanding. See the note below.
+      </p>
+    </div>
+
+    <div class="card">
+      <h3>greedy vs. sampling — which one plays the move?</h3>
+      <div class="grid-2">
+        <div class="stat">
+          <div class="sl">greedy — used for evaluation and play</div>
+          <div class="sv teal">argmax → cell 0</div>
+          <div class="sn">deterministic: always the same move on the same board</div>
+        </div>
+        <div class="stat">
+          <div class="sl">sampling — used only during training</div>
+          <div class="sv gold">cell 0 (99.7%) or cell 2 (0.3%)</div>
+          <div class="sn">stochastic: lets the model occasionally try a different move and learn from it</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>the metric that actually judges this: top-1 vs. chance</h3>
+      <p style="font-size:13px;color:var(--text-mid);line-height:1.7;margin:0 0 10px;">
+        The opening move can't be "wrong" — every cell is optimal — so this position doesn't move the needle on
+        <span class="mono">exhaustive_score</span>. The real test is <span class="mono">top1_forced</span>: accuracy
+        restricted to the ${3142} positions with exactly <b>one</b> correct move, where ties can't inflate the score.
+      </p>
+      <div class="grid-3">
+        <div class="stat"><div class="sl">chance (random guessing)</div><div class="sv">${CHANCE_TOP1.toFixed(3)}</div></div>
+        <div class="stat"><div class="sl">this position's contribution</div><div class="sv g">always correct</div><div class="sn">all 9 cells tied-optimal</div></div>
+        <div class="stat"><div class="sl">what actually matters</div><div class="sv gold">top1_forced</div><div class="sn">run it on your loaded model to know for sure</div></div>
+      </div>
+    </div>
+  `;
+
+  renderPredictFlow(document.getElementById("predictFlow"));
+
+  const probs = [0.997, 0.000, 0.003, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000];
+  const bars = document.getElementById("predictBars");
+  bars.innerHTML = probs.map((p,i) => {
+    const isChosen = i === 0;
+    const h = Math.max(2, p * 140);
+    const color = isChosen ? "#F2B134" : "#2BB3AC";
+    return `<div style="display:flex;flex-direction:column;align-items:center;width:10%;">
+      <div style="font-family:var(--mono);font-size:9.5px;color:${isChosen?'var(--gold)':'var(--text-low)'};margin-bottom:3px;">${p.toFixed(3)}</div>
+      <div style="width:70%;height:${h}px;background:${color};border-radius:2px 2px 0 0;"></div>
+      <div style="font-family:var(--mono);font-size:10px;color:var(--text-low);margin-top:4px;">${i}</div>
+    </div>`;
+  }).join("");
+}
+
+function renderPredictFlow(root){
+  const W = 900, H = 200;
+  const boxes = [
+    {x:10,  y:78, w:100, h:44, label:"prompt", shape:"(1, L)", color:"#182740"},
+    {x:150, y:60, w:130, h:80, label:"GPT-2\n12 layers", shape:"", color:"#1D3049"},
+    {x:320, y:78, w:70,  h:44, label:"h", shape:"(768,)", color:"#2BB3AC", text:"#04211F"},
+  ];
+  const policyBoxes = [
+    {x:430, y:20, w:130, h:40, label:"mask + softmax", shape:"", color:"#182740"},
+    {x:600, y:20, w:90,  h:40, label:"probs", shape:"(9,)", color:"#4E93D9", text:"#04152B"},
+    {x:730, y:20, w:110, h:40, label:"argmax → move", shape:"", color:"#F2B134", text:"#3A2600"},
+  ];
+  const valueBoxes = [
+    {x:430, y:135, w:130, h:40, label:"value head", shape:"(768→1)", color:"#2A1F42", text:"#8A7BB8"},
+    {x:600, y:135, w:90,  h:40, label:"value", shape:"(1,)", color:"#2A1F42", text:"#8A7BB8"},
+    {x:730, y:135, w:110, h:40, label:"✕ not used", shape:"", color:"#241A1A", text:"#7A5555"},
+  ];
+
+  function box(b, dashed){
+    const lines = b.label.split("\n");
+    let txt = lines.map((l,i)=>`<tspan x="${b.x+b.w/2}" dy="${i===0?0:13}">${l}</tspan>`).join("");
+    return `<rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" rx="8" fill="${b.color}"
+        stroke="${dashed?'#4A4040':'#33507A'}" stroke-width="1" ${dashed?'stroke-dasharray="4 3"':''}/>
+      <text x="${b.x+b.w/2}" y="${b.y+b.h/2 - (lines.length>1?4:0) - (b.shape?7:0)}" text-anchor="middle"
+        font-family="ui-sans-serif" font-size="11" fill="${b.text||'#EAF1FA'}" font-weight="600">${txt}</text>
+      ${b.shape ? `<text x="${b.x+b.w/2}" y="${b.y+b.h/2+13}" text-anchor="middle" font-family="ui-monospace,monospace" font-size="10.5" fill="${b.text||'#9FB3CC'}">${b.shape}</text>` : ""}`;
+  }
+  function arrow(x1,y1,x2,y2,color,dashed){
+    return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${color}" stroke-width="2"
+        marker-end="url(#predArrow)" ${dashed?'stroke-dasharray="4 3"':''}/>`;
+  }
+
+  let html = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;min-height:190px;">
+    <defs><marker id="predArrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 z" fill="#3A5170"/></marker></defs>`;
+  html += boxes.map(b=>box(b,false)).join("");
+  html += arrow(110,100,148,100);
+  html += arrow(280,100,318,100);
+  html += arrow(355,86,428,40,"#2BB3AC");
+  html += arrow(355,114,428,155,"#5A4A78",true);
+  html += policyBoxes.map(b=>box(b,false)).join("");
+  html += valueBoxes.map((b,i)=>box(b, i===2)).join("");
+  html += arrow(560,40,598,40);
+  html += arrow(690,40,728,40);
+  html += arrow(560,155,598,155,"#5A4A78",true);
+  html += arrow(690,155,728,155,"#5A4A78",true);
+  html += `<text x="10" y="14" font-family="ui-sans-serif" font-size="10.5" fill="#69809F">used to pick the move →</text>`;
+  html += `<text x="10" y="192" font-family="ui-sans-serif" font-size="10.5" fill="#69809F">computed, but discarded →</text>`;
+  html += `</svg>`;
+  root.innerHTML = html;
+}
+
+
+window.STEPS = STEPS;
+window.TOY_H = TOY_H; window.TOY_RET = TOY_RET;
+Object.defineProperty(window, "LIGHT_THEME", { get:()=>LIGHT_THEME });
+window.SIM = SIM;
+window.MOVES = MOVES;
+window.OLD_LOGP = OLD_LOGP; window.RETS = RETS; window.VALUES0 = VALUES0;
+window.TREE = TREE; window.CURVES = CURVES;
+window.CHANCE_TOP1 = CHANCE_TOP1; window.REF_RANDOM = REF_RANDOM; window.REF_PERFECT = REF_PERFECT;
+window.termsAt = termsAt; window.mean = mean;
+Object.defineProperty(window, "currentStep", { get:()=>currentStep, set:v=>{currentStep=v;} });
+
+renderAll();
+</script>
+</body>
+</html>
