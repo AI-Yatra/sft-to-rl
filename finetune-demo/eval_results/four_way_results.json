@@ -1,0 +1,106 @@
+{
+  "base_seen": {
+    "n": 30,
+    "json_valid_rate": 1.0,
+    "field_totals": {
+      "title": 23,
+      "date": 0,
+      "time": 11,
+      "location": 22,
+      "attendees": 4
+    },
+    "overall_field_accuracy": 0.4,
+    "hallucinated_attendees": 36
+  },
+  "base_holdout": {
+    "n": 30,
+    "json_valid_rate": 1.0,
+    "field_totals": {
+      "title": 26,
+      "date": 0,
+      "time": 12,
+      "location": 17,
+      "attendees": 3
+    },
+    "overall_field_accuracy": 0.38666666666666666,
+    "hallucinated_attendees": 37
+  },
+  "sft_seen": {
+    "n": 30,
+    "json_valid_rate": 1.0,
+    "field_totals": {
+      "title": 25,
+      "date": 1,
+      "time": 13,
+      "location": 21,
+      "attendees": 24
+    },
+    "overall_field_accuracy": 0.56,
+    "hallucinated_attendees": 4
+  },
+  "sft_holdout": {
+    "n": 30,
+    "json_valid_rate": 1.0,
+    "field_totals": {
+      "title": 27,
+      "date": 4,
+      "time": 15,
+      "location": 20,
+      "attendees": 22
+    },
+    "overall_field_accuracy": 0.5866666666666667,
+    "hallucinated_attendees": 6
+  },
+  "sft_dpo_seen": {
+    "n": 30,
+    "json_valid_rate": 1.0,
+    "field_totals": {
+      "title": 26,
+      "date": 0,
+      "time": 17,
+      "location": 22,
+      "attendees": 28
+    },
+    "overall_field_accuracy": 0.62,
+    "hallucinated_attendees": 0
+  },
+  "sft_dpo_holdout": {
+    "n": 30,
+    "json_valid_rate": 1.0,
+    "field_totals": {
+      "title": 27,
+      "date": 4,
+      "time": 20,
+      "location": 22,
+      "attendees": 26
+    },
+    "overall_field_accuracy": 0.66,
+    "hallucinated_attendees": 0
+  },
+  "sft_dpo_grpo_seen": {
+    "n": 30,
+    "json_valid_rate": 1.0,
+    "field_totals": {
+      "title": 25,
+      "date": 0,
+      "time": 22,
+      "location": 22,
+      "attendees": 27
+    },
+    "overall_field_accuracy": 0.64,
+    "hallucinated_attendees": 0
+  },
+  "sft_dpo_grpo_holdout": {
+    "n": 30,
+    "json_valid_rate": 1.0,
+    "field_totals": {
+      "title": 27,
+      "date": 4,
+      "time": 20,
+      "location": 22,
+      "attendees": 26
+    },
+    "overall_field_accuracy": 0.66,
+    "hallucinated_attendees": 0
+  }
+}

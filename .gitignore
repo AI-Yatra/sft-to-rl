@@ -1,0 +1,19 @@
+# Claude Code local session state (not project content)
+.claude/
+
+# Python
+__pycache__/
+*.py[oc]
+
+# uv-managed virtual environments (each finetune-demo/ subproject has its own)
+.venv/
+
+# Node (Slidev deck)
+node_modules/
+slides/dist/
+
+# Training checkpoints (large, regenerable -- the final adapter dirs like
+# lora-adapter/, dpo-adapter/, grpo-adapter/, countdown-grpo-adapter/ are
+# NOT covered by this and ARE committed, since those are the actual
+# trained weights people should be able to download and use)
+*-checkpoints/
