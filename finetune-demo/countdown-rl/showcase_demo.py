@@ -4,11 +4,19 @@ Countdown task, side by side. No SFT was ever applied to this model --
 whatever it does well here, it learned purely from a verifiable reward
 during GRPO training (see RESULTS.md for the training run this used).
 
-Usage (from this folder -- run `uv sync` once in ../ first, see ../README.md):
-    uv run --project .. python showcase_demo.py                  # a few built-in examples
+Usage (run `uv sync` once in finetune-demo/ first, see ../README.md).
+Works from either location -- the adapter path resolves relative to this
+file, not the current working directory:
+
+    # from finetune-demo/countdown-rl/:
+    uv run --project .. python showcase_demo.py
     uv run --project .. python showcase_demo.py --interactive     # type your own numbers/target
+
+    # from finetune-demo/:
+    uv run python countdown-rl/showcase_demo.py
 """
 import argparse
+import os
 import sys
 
 import torch
@@ -17,6 +25,9 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 
 from colab_train_countdown_grpo import BASE_MODEL, build_prompt
 from reward_fn import score_completion
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+DEFAULT_ADAPTER = os.path.join(HERE, "countdown-grpo-adapter")
 
 DEMO_EXAMPLES = [
     {"nums": [58, 80, 36], "target": 14},   # trained model genuinely SOLVES this
@@ -90,7 +101,7 @@ def run_example(base_model, base_tok, trained_model, trained_tok, nums, target):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--adapter", type=str, default="./countdown-grpo-adapter")
+    parser.add_argument("--adapter", type=str, default=DEFAULT_ADAPTER)
     parser.add_argument("--interactive", action="store_true")
     args = parser.parse_args()
 

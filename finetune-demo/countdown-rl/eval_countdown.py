@@ -6,6 +6,7 @@ Usage (Colab cell):
     !python eval_countdown.py --adapter ./countdown-grpo-adapter --n 100
 """
 import argparse
+import os
 
 import torch
 from datasets import load_dataset
@@ -14,6 +15,9 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 
 from colab_train_countdown_grpo import BASE_MODEL, build_prompt
 from reward_fn import score_completion
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+DEFAULT_ADAPTER = os.path.join(HERE, "countdown-grpo-adapter")
 
 
 def load_holdout(n, train_examples=3000, seed=42):
@@ -65,7 +69,7 @@ def evaluate(model, tokenizer, examples, device, label, max_new_tokens=300):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--adapter", type=str, default="./countdown-grpo-adapter")
+    parser.add_argument("--adapter", type=str, default=DEFAULT_ADAPTER)
     parser.add_argument("--n", type=int, default=100)
     args = parser.parse_args()
 
