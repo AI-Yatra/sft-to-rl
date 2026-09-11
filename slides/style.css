@@ -343,3 +343,10 @@
   color: var(--muted);
   margin-bottom: 0.6em;
 }
+
+.fullform {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.85em;
+  color: var(--muted);
+  margin: 0 0 1.2em 0;
+}

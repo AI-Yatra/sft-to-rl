@@ -31,6 +31,24 @@ failure, side by side, so the difference is concrete instead of theoretical.
 
 ---
 layout: center
+title: Scan for the repo
+---
+
+<div style="text-align:center;">
+<img src="/repo-qr.png" style="width:400px; height:400px; border:2px solid var(--rule); border-radius:16px; padding:14px; background:white; margin:0 auto; display:block;" />
+<div style="font-family:'IBM Plex Mono',monospace; font-size:1.2em; color:var(--navy); margin-top:0.8em; font-weight:600;">github.com/AI-Yatra/sft-to-rl</div>
+<div style="color:var(--muted); margin-top:0.3em; font-size:0.95em;">Everything's in there — code, trained weights, results, this deck</div>
+</div>
+
+<!--
+Hold on this slide for 30-60s at the very start — let the room actually scan it
+before diving in, rather than mentioning the repo once and moving on. Self-generated
+QR code (not a third-party shortener), points directly at
+github.com/AI-Yatra/sft-to-rl, verified public and clonable.
+-->
+
+---
+layout: center
 title: Agenda
 ---
 
@@ -219,6 +237,8 @@ title: SFT
 
 ## SFT — imitate labeled examples
 
+<div class="fullform">Supervised Fine-Tuning</div>
+
 <div class="grid grid-cols-2 gap-6 mt-4">
 <div class="panel-card">
 <h3>What it does</h3>
@@ -253,19 +273,19 @@ DPO section conceptually so the wait isn't dead air.
 title: SFT results in full
 ---
 
-## SFT — full before/after (held-out phrasing)
+## SFT — full before/after, both eval sets
 
-| Field | Before | After |
-|---|---|---|
-| title | 25/30 | 27/30 |
-| **date** | **0/30** | **5/30** |
-| time | 11/30 | 15/30 |
-| location | 17/30 | 19/30 |
-| attendees | 4/30 | 23/30 |
-| **Overall** | **38.0%** | **59.3%** |
-| Hallucinated attendees | 36 | 6 |
+| Field | Seen before | Seen after | Held-out before | Held-out after |
+|---|---|---|---|---|
+| title | 23/30 | 26/30 | 25/30 | 27/30 |
+| **date** | **0/30** | **1/30** | **0/30** | **5/30** |
+| time | 11/30 | 13/30 | 11/30 | 15/30 |
+| location | 22/30 | 21/30 | 17/30 | 19/30 |
+| attendees | 7/30 | 23/30 | 4/30 | 23/30 |
+| **Overall** | **42.0%** | **56.0%** | **38.0%** | **59.3%** |
+| Hallucinated attendees | 30 | 7 | 36 | 6 |
 
-<div class="mt-4 stamp">Improvement held on phrasing never seen in training — not memorization</div>
+<div class="mt-4 stamp">Held-out (phrasing never seen in training) improved MORE than seen — not memorization</div>
 
 <!--
 Point at attendees: biggest single-field jump (4→23), matches the hallucination
@@ -278,6 +298,8 @@ title: DPO
 ---
 
 ## DPO — prefer one answer over another
+
+<div class="fullform">Direct Preference Optimization</div>
 
 <div class="grid grid-cols-2 gap-6 mt-4">
 <div class="panel-card">
@@ -378,6 +400,8 @@ title: GRPO
 ---
 
 ## GRPO — trial and reward, no labels
+
+<div class="fullform">Group Relative Policy Optimization</div>
 
 <div class="mt-4" style="text-align:center;">
 <div class="grid grid-cols-5 gap-2 items-center">
@@ -811,6 +835,64 @@ then seconds per example.
 Actually run this on stage. Let the room watch the base model fail to close
 an <answer> tag, then the trained model solve one live. This is the moment
 of the whole talk — point it out explicitly.
+-->
+
+---
+title: If you run it yourself
+---
+
+## If you run it yourself: two things you'll notice
+
+<div class="grid grid-cols-2 gap-5 mt-4">
+
+<div class="panel-card">
+<h3>There's no system prompt at all</h3>
+<div style="font-size:0.68em; margin-top:0.6em; line-height:1.5;">
+
+```text
+"Using the numbers {nums}, create an
+equation that equals {target}. ...
+Show your work in <think> </think>
+tags, then return the final equation
+in <answer> </answer> tags...
+<think>"      <- prompt ends HERE, unclosed
+```
+
+</div>
+<div class="mt-3" style="color:var(--muted); font-size:0.88em;">
+One flat string, tokenized directly — no chat roles, no <code>apply_chat_template</code>.
+It ends mid-tag on purpose, priming the model to continue as if already reasoning.
+<b>The think/answer format isn't a model feature</b> — it's plain text the model
+was taught to produce because the reward function only pays out when it finds
+a well-formed <code>&lt;answer&gt;</code> block.
+</div>
+</div>
+
+<div class="panel-card bad">
+<h3>The [10, 3, 5] example can loop forever</h3>
+<div style="color:var(--muted); font-size:0.88em; margin-top:0.6em;">
+Greedy decoding (<code>do_sample=False</code>) always picks the single most
+probable next token — no randomness to break a repeating pattern. With no
+repetition penalty either (tried, made things worse — hallucinated
+<code>x</code>/<code>y</code>/<code>z</code> variables), a model that gets stuck
+predicting <code>&lt;think&gt;10 + 3&lt;/think&gt;</code> as "most probable"
+will keep predicting exactly that, forever. <code>&lt;/answer&gt;</code> never
+appears, so nothing stops it early.
+</div>
+<div class="mt-3 tag fail">Kept in the demo on purpose — an honest failure, not a bug</div>
+</div>
+
+</div>
+
+<div class="mt-6 stamp" style="display:block; width:fit-content; margin:0 auto;">Same exact decoding setup that produced every number in RESULTS.md — no cherry-picking for the demo</div>
+
+<!--
+This slide exists because someone will run showcase_demo.py themselves and hit
+the [10,3,5] infinite loop, or ask "wait, where's the system prompt?" — answer
+both before they ask. The prompt-engineering point (plain string vs chat format)
+is also a good aside: this model is a base model, may not even have a usable
+chat template, so plain-string prompting is the standard approach here, matching
+the TinyZero/Jiayi-Pan reproductions this demo is modeled on.
 -->
 
 ---
