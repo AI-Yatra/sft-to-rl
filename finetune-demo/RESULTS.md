@@ -2,9 +2,7 @@
 
 This is the as-run record of the full pipeline, kept verbatim for the session
 showcase: LoRA SFT (local, CPU) → DPO (Colab, T4 GPU) → GRPO (Colab, T4 GPU).
-Raw logs are `train.log` and `eval_before_after.log` (SFT stage, local) in
-this folder; the DPO/GRPO/four-way-eval logs are the Colab session transcript
-this file summarizes.
+Code for each stage lives in `sft/`, `dpo/`, `grpo/` respectively.
 
 ## The full pipeline result (real numbers, all four stages)
 
@@ -16,7 +14,7 @@ this file summarizes.
 | +SFT+DPO+GRPO | 64.0% | 66.0% | **0** | **0** |
 
 Run on Colab (T4 GPU) via `colab_eval_all.py`, evaluating all four stages
-against `data/eval_seen_phrasing.jsonl` and `data/eval_holdout_phrasing.jsonl`
+against `sft/data/eval_seen_phrasing.jsonl` and `sft/data/eval_holdout_phrasing.jsonl`
 in one process (30 examples each). Full JSON: [`eval_results/four_way_results.json`](./eval_results/four_way_results.json).
 
 **Reading the pipeline stage by stage:**
@@ -45,29 +43,26 @@ The rest of this document is the original SFT-only run record, kept as-is.
 
 Command:
 ```
-python train_lora.py --limit 150 --epochs 2 --batch-size 4 --grad-accum 2 --output ./lora-adapter
+cd sft
+uv run --project .. python train_lora.py --limit 150 --epochs 2 --batch-size 4 --grad-accum 2 --output ./lora-adapter
 ```
 
 - LoRA config: r=8, alpha=16, dropout=0.05, target modules `q_proj, k_proj, v_proj, o_proj`
 - Trainable params: **1,638,400 / 363,459,520 (0.45%)**
-- Training examples: 150 (of the 240 generated; see `data/train.jsonl`)
+- Training examples: 150 (of the 240 generated; see `sft/data/train.jsonl`)
 - `train_runtime`: **1043s (~17.4 min)**, 2 epochs, `train_loss`: **0.3162**
-- Output: `lora-adapter/` — 6.6MB (`adapter_model.safetensors`)
-
-Full log: [`train.log`](./train.log)
+- Output: `sft/lora-adapter/` — 6.6MB (`adapter_model.safetensors`)
 
 ## Evaluation run
 
 Command:
 ```
-python eval_before_after.py
+uv run python eval_before_after.py
 ```
 
 Runtime: ~44 minutes total on CPU (60 generations for base model, then 60 for
 the LoRA-adapted model, across both eval sets — most of the time is spent in
 generation, not model loading).
-
-Full log: [`eval_before_after.log`](./eval_before_after.log)
 
 ### Results — seen phrasing (30 examples, same phrasing style as training)
 
@@ -105,7 +100,7 @@ Full log: [`eval_before_after.log`](./eval_before_after.log)
 
 ## DPO stage (Colab, T4 GPU)
 
-Command: `colab_train_dpo.py --epochs 3 --output ./dpo-adapter` (on top of
+Command: `dpo/colab_train_dpo.py --epochs 3 --output ./dpo-adapter` (on top of
 the SFT adapter merged in). First attempt used the default `lr=5e-6` (TRL's
 full-fine-tune default) and produced a dead run — loss flat at `ln(2)≈0.693`
 the whole time, final `rewards/margins` slightly negative. Retrained with
@@ -115,7 +110,7 @@ the whole time, final `rewards/margins` slightly negative. Retrained with
 
 ## GRPO stage (Colab, T4 GPU)
 
-Command: `colab_train_grpo.py --epochs 1 --start-from sft_dpo --output ./grpo-adapter`.
+Command: `grpo/colab_train_grpo.py --epochs 1 --start-from sft_dpo --output ./grpo-adapter`.
 200 training prompts × 8 generations/prompt, `lr=1e-5`, `train_runtime`
 **1412s (~23.5 min)**. Reward oscillated between 0.32 and 0.61 throughout —
 first-10-steps average ~0.45, last-10-steps average ~0.48, a mild but real

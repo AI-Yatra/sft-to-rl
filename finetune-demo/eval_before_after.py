@@ -15,9 +15,9 @@ from field_scorer import evaluate_jsonl, print_eval_summary
 
 BASE_MODEL = "HuggingFaceTB/SmolLM2-360M-Instruct"
 HERE = os.path.dirname(os.path.abspath(__file__))
-ADAPTER_DIR = os.path.join(HERE, "lora-adapter")
-EVAL_SEEN = os.path.join(HERE, "data", "eval_seen_phrasing.jsonl")
-EVAL_HOLDOUT = os.path.join(HERE, "data", "eval_holdout_phrasing.jsonl")
+ADAPTER_DIR = os.path.join(HERE, "sft", "lora-adapter")
+EVAL_SEEN = os.path.join(HERE, "sft", "data", "eval_seen_phrasing.jsonl")
+EVAL_HOLDOUT = os.path.join(HERE, "sft", "data", "eval_holdout_phrasing.jsonl")
 
 
 def make_pipe(with_adapter):

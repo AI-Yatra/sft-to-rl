@@ -23,7 +23,7 @@ import json
 import sys
 import os
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 from field_scorer import CANONICAL_KEYS, flatten_fields, normalize_date, normalize_time, parse_json_loose
 
 

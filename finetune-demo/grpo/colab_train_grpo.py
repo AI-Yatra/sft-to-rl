@@ -1,8 +1,8 @@
 """
 GRPO training for the text-to-calendar-JSON task, sized for a free Colab GPU
 (T4/L4) — this is the piece that never made sense to attempt on the laptop's
-CPU (see rfi/lora-rl-learning-guide.md): GRPO samples several completions per
-prompt every step, which needs real parallel generation throughput.
+CPU: GRPO samples several completions per prompt every step, which needs
+real parallel generation throughput.
 
 Reward is `reward_fn.calendar_json_reward` — a verifiable reward computed
 directly from the gold JSON each prompt was generated from (no separate
@@ -14,10 +14,10 @@ was modeled on: https://huggingface.co/blog/grpo-with-trl-ifstruct
     !pip install -q transformers accelerate peft trl datasets
 
     !git clone <your-repo-url> repo
-    %cd repo/rfi/finetune-demo
+    %cd repo/rfi/finetune-demo/grpo
 
     # (Optional) start from the SFT+DPO result instead of the base model —
-    # upload lora-adapter/ and dpo-adapter/ alongside this script if so.
+    # needs ../sft/lora-adapter/ and ../dpo/dpo-adapter/ to be present.
 
 Then run:
     !python colab_train_grpo.py --epochs 1 --output ./grpo-adapter
@@ -40,8 +40,8 @@ from reward_fn import calendar_json_reward
 
 BASE_MODEL = "HuggingFaceTB/SmolLM2-360M-Instruct"
 HERE = os.path.dirname(os.path.abspath(__file__))
-SFT_ADAPTER_DIR = os.path.join(HERE, "lora-adapter")
-DPO_ADAPTER_DIR = os.path.join(HERE, "dpo-adapter")
+SFT_ADAPTER_DIR = os.path.join(HERE, "..", "sft", "lora-adapter")
+DPO_ADAPTER_DIR = os.path.join(HERE, "..", "dpo", "dpo-adapter")
 GRPO_TRAIN_PATH = os.path.join(HERE, "data", "grpo_train.jsonl")
 
 

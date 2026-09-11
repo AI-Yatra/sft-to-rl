@@ -1,0 +1,70 @@
+{
+  "$schema": "https://aka.ms/codetour-schema",
+  "title": "GRPO: Reward Function Walkthrough",
+  "description": "Step through the actual reward function the GRPO training stage runs on -- not a simplified stand-in. Everything about whether GRPO works or fails comes down to this function.",
+  "steps": [
+    {
+      "title": "Why a verifiable reward",
+      "description": "No training happens in this tour -- the goal is a precise mental model of the number the model is being pushed toward, before watching it climb (or not) during training.\n\nThe reward is computed directly from the gold JSON the training prompt was generated from. No reward model, no human preference data, no learned component at all -- just code that checks: does the model's output match the fields it should have extracted?\n\nA *learned* reward model can be wrong or exploitable on its own. A verifiable reward can still be *designed* wrong (we'll see an example), but there's no second model's mistakes stacked on top of the first."
+    },
+    {
+      "file": "finetune-demo/grpo/reward_fn.py",
+      "line": 9,
+      "description": "**The scoring rule, in one sentence:** reward = fraction of these 5 fields that match gold (title, date, time, location, attendees), using the same matching logic as `field_scorer.py` -- the same code the eval scripts use.\n\nThat's deliberate: \"reward went up\" and \"field accuracy went up\" are *the same measurement*, not two metrics that could silently diverge."
+    },
+    {
+      "file": "finetune-demo/grpo/reward_fn.py",
+      "line": 30,
+      "description": "`_score_one` scores a single completion against a single gold JSON. This is the function everything else calls."
+    },
+    {
+      "file": "finetune-demo/grpo/reward_fn.py",
+      "line": 31,
+      "description": "**Hard zero for invalid JSON, no partial credit.**\n\nWithout this, a model could learn to produce almost-JSON that happens to fuzzy-match gold values in the raw text, farming reward without ever actually solving the task. This closes that exploit off completely."
+    },
+    {
+      "file": "finetune-demo/grpo/reward_fn.py",
+      "line": 38,
+      "description": "Title match: fuzzy substring check (case-insensitive, either direction). Loose on purpose -- title phrasing has real, acceptable variation (\"Coffee\" vs \"Coffee chat\")."
+    },
+    {
+      "file": "finetune-demo/grpo/reward_fn.py",
+      "line": 43,
+      "description": "Date match: exact, normalized equality -- no fuzziness at all.\n\nThis is the field that stayed broken across SFT, DPO, AND GRPO (see `EXPERIMENTS.md` and `RESULTS.md`). Keep this line in mind for the last step of this tour."
+    },
+    {
+      "file": "finetune-demo/grpo/reward_fn.py",
+      "line": 59,
+      "description": "Attendees: exact set equality after normalizing case/whitespace. A model that invents or drops even one name fails this check."
+    },
+    {
+      "file": "finetune-demo/grpo/reward_fn.py",
+      "line": 67,
+      "description": "`field_score = hits / 5` -- this is the number that, averaged over an eval set, is literally the same statistic as `overall_field_accuracy` in every RESULTS.md table."
+    },
+    {
+      "file": "finetune-demo/grpo/reward_fn.py",
+      "line": 69,
+      "description": "**The reward-hacking guard.** Without this penalty, a model could learn to always output `\"attendees\": []` -- it would score fine on JSON validity and even pass the attendees field on any example that genuinely has no attendees, while providing zero real information and never being penalized for omission.\n\nThe penalty targets the specific failure mode that actually mattered here: *confidently inventing* a name that isn't in the source text, not merely leaving attendees out."
+    },
+    {
+      "file": "finetune-demo/grpo/reward_fn.py",
+      "line": 73,
+      "description": "`max(0.0, ...)` floors the reward at zero -- a badly hallucinated completion can't score negative, it just loses credit down to nothing."
+    },
+    {
+      "file": "finetune-demo/grpo/reward_fn.py",
+      "line": 85,
+      "description": "`calendar_json_reward` is what `GRPOTrainer` actually calls each step. It receives a *batch* of completions (one per generation, across all prompts sampled that step) plus the `gold_json` and `source_text` dataset columns, and returns a list of floats -- one reward per completion, same order."
+    },
+    {
+      "file": "finetune-demo/grpo/reward_fn.py",
+      "line": 100,
+      "description": "Run this file directly (`python reward_fn.py` from inside `finetune-demo/grpo/`) to self-test: a perfect completion scores 1.0, a hallucinated one scores between 0 and 1, and garbage scores exactly 0.0."
+    },
+    {
+      "title": "Connecting this to GRPO itself",
+      "description": "GRPO doesn't use this reward value as a loss directly -- it computes a **group-relative advantage**: for each prompt, the trainer samples several completions (8, in our runs), scores each with this function, then normalizes *within that group* (subtract the group mean, divide by the group std). A completion only gets reinforced if it scored better than its own group's average, on the same prompt.\n\nThis is why the reward needs real *variance* to be useful. If every one of the 8 completions for a prompt gets the same score, the group's std is ~0, and there is nothing to push the model toward or away from.\n\nThis is exactly what happened on the `date` field (see `EXPERIMENTS.md` #5): the base model almost never got it right, so nearly every group of 8 scored identically on that field -- no amount of reward *reweighting* could fix that, because the problem was zero variance, not wrong weighting.\n\nSee also: `countdown-rl/reward_fn.py` for a second, simpler verifiable-reward example (pure arithmetic, no JSON field matching)."
+    }
+  ]
+}

@@ -181,7 +181,9 @@ if __name__ == "__main__":
     eval_seen_phrasing = build_records(30, TRAIN_DATE_PHRASINGS)
     eval_holdout_phrasing = build_records(30, EVAL_ONLY_DATE_PHRASINGS)
 
-    out_dir = "/tmp/claude-1000/-home-fl-lpt-867-projects-personal-git-ai-yatra-rfi/e6c92a38-181f-4811-b01f-f05846fc10e5/scratchpad"
+    import os
+    out_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
+    os.makedirs(out_dir, exist_ok=True)
     with open(f"{out_dir}/train.jsonl", "w") as f:
         for r in train:
             f.write(json.dumps(r, ensure_ascii=False) + "\n")

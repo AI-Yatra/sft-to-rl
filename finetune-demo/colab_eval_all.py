@@ -19,11 +19,11 @@ from field_scorer import evaluate_jsonl, print_eval_summary
 
 BASE_MODEL = "HuggingFaceTB/SmolLM2-360M-Instruct"
 HERE = os.path.dirname(os.path.abspath(__file__))
-SFT_ADAPTER = os.path.join(HERE, "lora-adapter")
-DPO_ADAPTER = os.path.join(HERE, "dpo-adapter")
-GRPO_ADAPTER = os.path.join(HERE, "grpo-adapter")
-EVAL_SEEN = os.path.join(HERE, "data", "eval_seen_phrasing.jsonl")
-EVAL_HOLDOUT = os.path.join(HERE, "data", "eval_holdout_phrasing.jsonl")
+SFT_ADAPTER = os.path.join(HERE, "sft", "lora-adapter")
+DPO_ADAPTER = os.path.join(HERE, "dpo", "dpo-adapter")
+GRPO_ADAPTER = os.path.join(HERE, "grpo", "grpo-adapter")
+EVAL_SEEN = os.path.join(HERE, "sft", "data", "eval_seen_phrasing.jsonl")
+EVAL_HOLDOUT = os.path.join(HERE, "sft", "data", "eval_holdout_phrasing.jsonl")
 
 STAGES = [
     ("base", "BASE", []),

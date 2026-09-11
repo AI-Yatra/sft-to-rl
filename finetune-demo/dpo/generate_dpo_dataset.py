@@ -15,9 +15,12 @@ signature failure).
 """
 import copy
 import json
+import os
 import random
+import sys
 from datetime import timedelta
 
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "sft"))
 from generate_dataset import (
     EVENTS, LOCATIONS, PEOPLE, TRAIN_DATE_PHRASINGS, SYSTEM_TEMPLATE, WEEKDAY_NAMES,
     make_example, random_reference_date,

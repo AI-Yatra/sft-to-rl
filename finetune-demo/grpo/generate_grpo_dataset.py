@@ -13,7 +13,9 @@ so all three stages (SFT/DPO/GRPO) are grounded in the same gold logic.
 import json
 import os
 import random
+import sys
 
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "sft"))
 from generate_dataset import SYSTEM_TEMPLATE, TRAIN_DATE_PHRASINGS, WEEKDAY_NAMES, make_example, random_reference_date
 
 random.seed(99)

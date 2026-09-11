@@ -51,3 +51,19 @@ Both demos are self-contained `uv` projects (see
 step-by-step, local and Colab). The trained adapter weights for every
 stage are committed directly (a few MB each — LoRA adapters, not full
 model checkpoints), so nothing needs retraining just to see the results.
+Part 1's code is organized by method —
+[`finetune-demo/sft/`](./finetune-demo/sft/),
+[`finetune-demo/dpo/`](./finetune-demo/dpo/),
+[`finetune-demo/grpo/`](./finetune-demo/grpo/) — each self-contained with
+its dataset generator, training script(s), trained adapter, and data.
+
+## Live walkthrough (VS Code + CodeTour)
+
+For presenting on stage: install
+[CodeTour](https://marketplace.visualstudio.com/items?itemName=vsls-contrib.codetour),
+open this repo in VS Code, and run **CodeTour: Start Tour** from the command
+palette. `.tours/grpo-reward-function.tour` walks through `finetune-demo/grpo/reward_fn.py`
+line by line — what "verifiable reward" means, the hallucination-penalty
+reward-hacking guard, and how it connects to GRPO's group-relative
+advantage (including why the `date` field couldn't be fixed by reward
+reweighting alone).
