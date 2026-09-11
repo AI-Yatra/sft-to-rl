@@ -986,13 +986,10 @@ is one of them. Writes technical blogs, ships weird side projects, and this time
 the weird project was training a 360M-parameter model on a laptop.
 </div>
 
-<div class="mt-4" style="font-family:'IBM Plex Mono',monospace; font-size:0.85em; color:var(--muted);">
-internetwasmyidea@gmail.com
-</div>
-
-<div class="mt-5 flex gap-8" style="align-items:baseline;">
-<div style="font-family:'IBM Plex Mono',monospace; font-size:1.8em; font-weight:600; color:var(--navy);">rzero.in</div>
-<div style="font-family:'IBM Plex Mono',monospace; font-size:1.8em; font-weight:600; color:var(--navy);">+91 63011 17211</div>
+<div class="mt-5" style="display:flex; flex-direction:column; gap:0.5em;">
+<div style="font-family:'IBM Plex Mono',monospace; font-size:1.3em; font-weight:600; color:var(--navy);">https://rzero.in</div>
+<div style="font-family:'IBM Plex Mono',monospace; font-size:1.3em; font-weight:600; color:var(--navy);">internetwasmyidea@gmail.com</div>
+<div style="font-family:'IBM Plex Mono',monospace; font-size:1.3em; font-weight:600; color:var(--navy);">+91 63011 17211</div>
 </div>
 </div>
 
