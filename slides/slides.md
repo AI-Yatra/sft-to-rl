@@ -964,3 +964,35 @@ layout: center
 Repo has everything: datasets, scripts, adapters, RESULTS.md and EXPERIMENTS.md
 with the full negative-result writeups, and showcase_demo.py to try at home.
 -->
+
+---
+title: About me
+---
+
+<div class="grid grid-cols-[auto_1fr] gap-10 items-center mt-4">
+
+<div>
+<img src="/about-me.jpg" style="width:340px; height:auto; border-radius:16px; border:2px solid var(--rule); display:block;" />
+</div>
+
+<div>
+<div class="eyebrow">Speaker</div>
+<h1 style="border:none; font-size:2em; margin-bottom:0.1em;">Jagadeeswara Reddy Peram</h1>
+<div style="font-family:'IBM Plex Mono',monospace; color:var(--muted); font-size:0.95em; margin-bottom:1em;">Backend Lead &middot; 10+ years in the industry</div>
+
+<div style="font-size:1.02em; color:var(--ink); max-width:56ch;">
+Spends a lot of time trying things that have no clear reason to work — this talk
+is one of them. Writes technical blogs, ships weird side projects, and this time
+the weird project was training a 360M-parameter model on a laptop.
+</div>
+
+<div class="mt-5 flex gap-4" style="font-family:'IBM Plex Mono',monospace; font-size:0.85em; color:var(--navy);">
+<span>rzero.in</span>
+<span style="color:var(--rule);">&middot;</span>
+<span>internetwasmyidea@gmail.com</span>
+<span style="color:var(--rule);">&middot;</span>
+<span>+91 63011 17211</span>
+</div>
+</div>
+
+</div>
