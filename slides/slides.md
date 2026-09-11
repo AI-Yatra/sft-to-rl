@@ -115,7 +115,7 @@ title: LoRA in one picture
 <div class="lora-diagram">
   <div class="lora-col">
     <div class="lora-box lora-w">W</div>
-    <div class="lora-caption">frozen</div>
+    <div class="lora-caption">frozen<br><span style="opacity:0.7;">(d_out &times; d_in)</span></div>
   </div>
   <div class="lora-op">+</div>
   <div class="lora-col">
@@ -124,7 +124,7 @@ title: LoRA in one picture
       <div class="lora-op" style="margin:0 0.3em;">&times;</div>
       <div class="lora-box lora-b">B</div>
     </div>
-    <div class="lora-caption">trainable, rank r</div>
+    <div class="lora-caption">trainable, rank r<br><span style="opacity:0.7;">(d_out&times;r) &middot; (r&times;d_in)</span></div>
   </div>
 </div>
 
@@ -143,11 +143,26 @@ in 17 minutes" possible at all.
 
 </div>
 
+<div class="mt-6 panel-card" style="text-align:center;">
+<div style="font-family:'IBM Plex Mono',monospace; font-size:1.05em;">
+y = x&middot;W <span style="color:var(--muted);">+</span> x&middot;A&middot;B
+</div>
+<div class="mt-2" style="color:var(--muted); font-size:0.85em;">
+A(d_out&times;r) &times; B(r&times;d_in) &rarr; the shared <b>r</b> cancels, leaving
+(d_out&times;d_in) — <b>the same shape as W</b>, which is the only reason
+"+" is even legal here. r=8 in our run vs. hundreds of real dimensions in W:
+same shape, far fewer numbers to learn.
+</div>
+</div>
+
 <!--
 Point at the diagram: W is the original model's weight matrix, frozen entirely.
 A and B are small — their product approximates a full-rank update without ever
 materializing one. r=8 in our config means A and B's inner dimension is 8, tiny
-compared to the hundreds of dimensions in W.
+compared to the hundreds of dimensions in W. If asked "why does A×B come out
+the same shape as W": the inner dimension r cancels in the multiplication,
+leaving the outer dimensions (d_out × d_in) -- same shape, which is required
+for W + AB to even be valid matrix addition.
 -->
 
 ---
@@ -222,16 +237,16 @@ answer — no guarantee the model can generalize the underlying logic
 <div class="mt-6 panel-card good">
 <div class="grid grid-cols-4 gap-4" style="text-align:center;">
 <div><div class="metric good" style="font-size:1.3em;">150</div><div style="font-size:0.8em;color:var(--muted);">examples</div></div>
-<div><div class="metric good" style="font-size:1.3em;">17 min</div><div style="font-size:0.8em;color:var(--muted);">CPU, laptop</div></div>
+<div><div class="metric good" style="font-size:1.3em;">17 min</div><div style="font-size:0.8em;color:var(--muted);">CPU, laptop — $0</div></div>
 <div><div class="metric good" style="font-size:1.3em;">38→56%</div><div style="font-size:0.8em;color:var(--muted);">field accuracy</div></div>
 <div><div class="metric good" style="font-size:1.3em;">30→7</div><div style="font-size:0.8em;color:var(--muted);">hallucinations</div></div>
 </div>
 </div>
 
 <!--
-Run this live if time allows: python train_lora.py --limit 150 --epochs 2. While
-it trains (real ~17 min), walk the room through the DPO section conceptually so
-the wait isn't dead air.
+Run this live if time allows: from finetune-demo/, `uv run python sft/train_lora.py
+--limit 150 --epochs 2`. While it trains (real ~17 min), walk the room through the
+DPO section conceptually so the wait isn't dead air.
 -->
 
 ---
@@ -285,6 +300,19 @@ drop_attendee &middot; wrong_location &middot; mis_nested
 No reward function, no sampling — just: given two candidate answers, learn to
 assign higher probability to the better one. Good at stamping out
 <i>specific known failure modes</i>, since you choose exactly what to corrupt.
+</div>
+
+<div class="mt-6 panel-card good">
+<div class="grid grid-cols-3 gap-4" style="text-align:center;">
+<div><div class="metric good" style="font-size:1.3em;">29 min</div><div style="font-size:0.8em;color:var(--muted);">Colab T4, free tier</div></div>
+<div><div class="metric good" style="font-size:1.3em;">$0</div><div style="font-size:0.8em;color:var(--muted);">no paid compute</div></div>
+<div><div class="metric good" style="font-size:1.3em;">150</div><div style="font-size:0.8em;color:var(--muted);">preference pairs</div></div>
+</div>
+</div>
+
+<div class="mt-3" style="text-align:center; color:var(--muted); font-size:0.82em;">
+Why GPU here and not the laptop CPU like SFT: DPOTrainer runs <b>two</b> forward
+passes per step (policy + reference model) — double the throughput need.
 </div>
 
 ---
@@ -368,6 +396,19 @@ The model's own generations become the training signal, scored against
 each other within the group of 8.
 </div>
 
+<div class="mt-6 panel-card good">
+<div class="grid grid-cols-3 gap-4" style="text-align:center;">
+<div><div class="metric good" style="font-size:1.3em;">23.5 min</div><div style="font-size:0.8em;color:var(--muted);">Colab T4, free tier</div></div>
+<div><div class="metric good" style="font-size:1.3em;">$0</div><div style="font-size:0.8em;color:var(--muted);">no paid compute</div></div>
+<div><div class="metric good" style="font-size:1.3em;">1,600</div><div style="font-size:0.8em;color:var(--muted);">generations (200 prompts &times; 8)</div></div>
+</div>
+</div>
+
+<div class="mt-3" style="text-align:center; color:var(--muted); font-size:0.82em;">
+Why GPU here too: 8 generations per prompt, every step — the laptop CPU could
+do this, just not before the talk ends.
+</div>
+
 <!--
 "Group relative" is the key word in the name: the model isn't compared against
 an absolute bar, it's compared against its OWN other attempts on the same
@@ -411,10 +452,17 @@ The hallucination penalty exists to close a specific loophole: without it,
 always guessing <code>attendees: []</code> could farm reward on easy examples.
 </div>
 
+<div class="mt-3 stamp">Live: CodeTour walkthrough of this file, line by line — see .tours/ in the repo</div>
+
 <!--
 This is the "reward hacking" concept in one slide. If your reward function has
 a blind spot, RL will find it — that's not a bug in RL, it's RL doing exactly
 what it's designed to do: maximize the number you gave it, however it can.
+
+If presenting from VS Code: switch over now and run CodeTour: Start Tour on
+.tours/grpo-reward-function.tour instead of just showing this static slide —
+it walks the exact same points (hard zero on invalid JSON, hallucination
+penalty, group-relative advantage) directly in the real source file.
 -->
 
 ---
@@ -423,12 +471,12 @@ title: GRPO results
 
 ## The full pipeline, four stages
 
-| Stage | Seen | Held-out | Halluc. (seen) | Halluc. (held-out) |
+| Stage | Seen | Held-out | Halluc. (seen/held) | Time &middot; infra |
 |---|---|---|---|---|
-| BASE | 40.0% | 38.7% | 36 | 37 |
-| +SFT | 56.0% | 58.7% | 4 | 6 |
-| +SFT+DPO | 62.0% | 66.0% | 0 | 0 |
-| **+SFT+DPO+GRPO** | **64.0%** | **66.0%** | 0 | 0 |
+| BASE | 40.0% | 38.7% | 36 / 37 | — |
+| +SFT | 56.0% <span style="color:var(--good); font-size:0.8em;">(+16pp)</span> | 58.7% <span style="color:var(--good); font-size:0.8em;">(+20pp)</span> | 4 / 6 | 17 min &middot; CPU laptop |
+| +SFT+DPO | 62.0% <span style="color:var(--good); font-size:0.8em;">(+6pp)</span> | 66.0% <span style="color:var(--good); font-size:0.8em;">(+7pp)</span> | 0 / 0 | 29 min &middot; Colab T4 |
+| **+SFT+DPO+GRPO** | **64.0%** <span style="color:var(--muted); font-size:0.8em;">(+2pp)</span> | **66.0%** <span style="color:var(--muted); font-size:0.8em;">(+0pp)</span> | 0 / 0 | 23.5 min &middot; Colab T4 |
 
 <div class="mt-6" style="color:var(--muted);">
 A small, real gain on seen phrasing — flat on held-out. Consistent with the
@@ -436,6 +484,55 @@ training curve itself: reward drifted mildly upward over one epoch, not a
 clean climb. Read as: GRPO didn't hurt, and helped a little, but one epoch on
 200 prompts wasn't enough to move generalization further than DPO already had.
 </div>
+
+---
+title: Training curves, all three stages
+---
+
+## What the training curves actually looked like
+
+<div class="grid grid-cols-3 gap-3 mt-4">
+
+<div class="curve-panel sft">
+<h4>SFT &middot; loss</h4>
+<div class="curve-bars">
+<div class="bar" style="height:100%"></div><div class="bar" style="height:88%"></div><div class="bar" style="height:78%"></div><div class="bar" style="height:70%"></div><div class="bar" style="height:62%"></div><div class="bar" style="height:55%"></div><div class="bar" style="height:49%"></div><div class="bar" style="height:44%"></div><div class="bar" style="height:40%"></div><div class="bar" style="height:37%"></div><div class="bar" style="height:34%"></div><div class="bar" style="height:32%"></div><div class="bar" style="height:30%"></div><div class="bar" style="height:29%"></div><div class="bar" style="height:28%"></div><div class="bar" style="height:27%"></div>
+</div>
+<div class="curve-endlabels"><span>step 0</span><span>step 60</span></div>
+<div class="curve-caption">smooth decline, 2 epochs &rarr; final loss 0.316. Clean fit — expected, it's imitating 150 fixed examples.</div>
+</div>
+
+<div class="curve-panel dpo">
+<h4>DPO &middot; loss (after lr fix)</h4>
+<div class="curve-bars">
+<div class="bar" style="height:100%"></div><div class="bar" style="height:92%"></div><div class="bar" style="height:82%"></div><div class="bar" style="height:74%"></div><div class="bar" style="height:68%"></div><div class="bar" style="height:63%"></div><div class="bar" style="height:60%"></div><div class="bar" style="height:58%"></div><div class="bar" style="height:57%"></div><div class="bar" style="height:56%"></div><div class="bar" style="height:56%"></div><div class="bar" style="height:55%"></div><div class="bar" style="height:56%"></div><div class="bar" style="height:55%"></div><div class="bar" style="height:56%"></div><div class="bar" style="height:55%"></div>
+</div>
+<div class="curve-endlabels"><span>step 0</span><span>step ~90</span></div>
+<div class="curve-caption">drops fast, then flattens ~0.55-0.60 for the back half of training — this IS a plateau, just a shallower one than GRPO's.</div>
+</div>
+
+<div class="curve-panel grpo">
+<h4>GRPO &middot; reward</h4>
+<div class="curve-bars">
+<div class="bar" style="height:55%"></div><div class="bar" style="height:70%"></div><div class="bar" style="height:45%"></div><div class="bar" style="height:60%"></div><div class="bar" style="height:80%"></div><div class="bar" style="height:50%"></div><div class="bar" style="height:65%"></div><div class="bar" style="height:40%"></div><div class="bar" style="height:58%"></div><div class="bar" style="height:72%"></div><div class="bar" style="height:48%"></div><div class="bar" style="height:66%"></div><div class="bar" style="height:52%"></div><div class="bar" style="height:78%"></div><div class="bar" style="height:60%"></div><div class="bar" style="height:50%"></div>
+</div>
+<div class="curve-endlabels"><span>step 0</span><span>step 200</span></div>
+<div class="curve-caption">no clean climb at all — noisy oscillation the entire run (reward 0.32-0.61). Higher bar = higher reward here, unlike the two loss panels.</div>
+</div>
+
+</div>
+
+<div class="mt-6 stamp" style="display:block; width:fit-content; margin:1.2em auto 0;">Shapes reconstructed from each run's logged summary stats (start/end/range) — not a raw per-step export</div>
+
+<!--
+Point out the contrast in shapes deliberately: SFT looks like "normal" training
+because it IS normal training (supervised, fixed target, clean loss surface).
+DPO looks like normal training that plateaus early. GRPO doesn't even look like
+a loss curve — it's noisy the whole time, because reward-based RL with only 200
+prompts and 1 epoch just doesn't have enough steps to smooth out that noise.
+This sets up the next-but-one slide: plateauing itself is completely normal,
+what matters is WHY each one plateaus where it does.
+-->
 
 ---
 title: The honest problem
@@ -523,6 +620,56 @@ counter-case: it only works if the model can already stumble into the right
 answer occasionally. Set up Part 2 as the demonstration of GRPO working when
 that condition IS met.
 -->
+
+---
+title: Why plateaus happen
+---
+
+## Every curve plateaus. This is normal — the question is why.
+
+<div class="panel-card mt-4" style="text-align:center;">
+<div style="font-size:1.05em;">
+A curve flattens the moment more steps stop adding <b>new information</b> —
+not a failure state, just the training signal running out.
+</div>
+</div>
+
+<div class="grid grid-cols-3 gap-3 mt-6">
+
+<div class="panel-card">
+<h3 style="color:var(--navy);">SFT plateaus because</h3>
+<div style="font-size:0.9em; color:var(--muted); margin-top:0.4em;">
+150 <b>fixed</b> examples. More epochs on the same set refines the fit to
+those examples — doesn't add a single new fact about date arithmetic.
+</div>
+</div>
+
+<div class="panel-card">
+<h3 style="color:var(--gold);">DPO plateaus because</h3>
+<div style="font-size:0.9em; color:var(--muted); margin-top:0.4em;">
+6 <b>fixed</b> corruption types. Only teaches "avoid this specific mistake" —
+<code>wrong_date</code> was 1 of 6, never enough concentrated signal alone.
+</div>
+</div>
+
+<div class="panel-card">
+<h3 style="color:var(--good);">GRPO plateaus because</h3>
+<div style="font-size:0.9em; color:var(--muted); margin-top:0.4em;">
+Zero <b>reward variance</b> on date. Nothing new can be learned from a
+signal that's constant across every sample — see the last slide.
+</div>
+</div>
+
+</div>
+
+<div class="mt-8 stamp" style="display:block; width:fit-content; margin:2em auto 0;">Same underlying cause, three different flavors: no new information entering the training signal</div>
+
+<div class="mt-6" style="text-align:center; color:var(--muted); font-size:0.88em;">
+Not unique to our small task — the same shape (fast improvement, then flat)
+is why pretraining needs ever <i>more and different</i> data, not just more
+steps on the same corpus. Pushing past a plateau always means changing what
+the model sees, not just how long it sees it.
+</div>
 
 ---
 layout: section
@@ -647,8 +794,8 @@ title: Live demo
 
 <div class="panel-card mt-4" style="font-family:'IBM Plex Mono',monospace; font-size:1em;">
 <div style="color:var(--muted);">$</div>
-<div>cd finetune-demo/countdown-rl</div>
-<div>python showcase_demo.py</div>
+<div>cd finetune-demo && uv sync</div>
+<div>cd countdown-rl && uv run --project .. python showcase_demo.py</div>
 </div>
 
 <div class="mt-6" style="color:var(--muted);">
@@ -665,6 +812,46 @@ Actually run this on stage. Let the room watch the base model fail to close
 an <answer> tag, then the trained model solve one live. This is the moment
 of the whole talk — point it out explicitly.
 -->
+
+---
+title: What this actually cost
+---
+
+## The whole session, start to finish
+
+<div class="grid grid-cols-4 gap-3 mt-4" style="text-align:center;">
+<div class="panel-card">
+<div class="metric" style="font-size:1.3em; color:var(--navy);">SFT</div>
+<div style="font-size:0.85em; color:var(--muted); margin-top:0.3em;">17 min<br>laptop CPU</div>
+</div>
+<div class="panel-card">
+<div class="metric" style="font-size:1.3em; color:var(--gold);">DPO</div>
+<div style="font-size:0.85em; color:var(--muted); margin-top:0.3em;">29 min<br>Colab T4</div>
+</div>
+<div class="panel-card">
+<div class="metric" style="font-size:1.3em; color:var(--good);">GRPO</div>
+<div style="font-size:0.85em; color:var(--muted); margin-top:0.3em;">23.5 min<br>Colab T4</div>
+</div>
+<div class="panel-card">
+<div class="metric" style="font-size:1.3em; color:var(--good);">Countdown</div>
+<div style="font-size:0.85em; color:var(--muted); margin-top:0.3em;">47 min<br>Colab T4</div>
+</div>
+</div>
+
+<div class="mt-8 panel-card good" style="text-align:center;">
+<div class="grid grid-cols-2 gap-6">
+<div><div class="metric good" style="font-size:1.8em;">~2 hours</div><div style="font-size:0.85em;color:var(--muted); margin-top:0.3em;">total training compute, all four runs combined</div></div>
+<div><div class="metric good" style="font-size:1.8em;">$0</div><div style="font-size:0.85em;color:var(--muted); margin-top:0.3em;">own laptop + Colab's free tier, nothing paid</div></div>
+</div>
+</div>
+
+<div class="mt-6" style="text-align:center; color:var(--muted); font-size:0.9em;">
+<b>Why CPU for SFT but GPU for everything else:</b> SFT is one forward+backward
+pass per example — small and fast enough for a laptop. DPO needs two forward
+passes per step (policy + reference); GRPO needs eight generations per prompt,
+every step. Same laptop, same budget — the <i>training signal's</i> shape is
+what decided the hardware, not the task's difficulty.
+</div>
 
 ---
 title: Takeaways
