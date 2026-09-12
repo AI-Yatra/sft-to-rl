@@ -694,6 +694,20 @@ function renderPlayGames(root){
       </div>
     </div>
 
+    <div class="card">
+      <h3>the buffer: one row per decision the model made</h3>
+      <div style="overflow-x:auto;">
+        <table class="grid" id="bufTable">
+          <thead><tr><th>game</th><th>move #</th><th>action</th><th>logp</th><th>value</th><th>ret</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <p class="note">
+        Each row was collected with <span class="mono">@torch.no_grad()</span> — no gradients yet, just recording what happened.
+        <b>Notice what is NOT recorded:</b> the correct move. Nobody looked it up. Not even the solver was consulted.
+      </p>
+    </div>
+
     <div class="card" id="spotlightCard" style="display:none;">
       <h3>spotlight: game 1's latest decision, worked with real equations</h3>
       <div id="spotlightBody"></div>
@@ -708,20 +722,6 @@ function renderPlayGames(root){
         derived from GPT-2.
       </p>
       <div id="valueMlpDemo"></div>
-    </div>
-
-    <div class="card">
-      <h3>the buffer: one row per decision the model made</h3>
-      <div style="overflow-x:auto;">
-        <table class="grid" id="bufTable">
-          <thead><tr><th>game</th><th>move #</th><th>action</th><th>logp</th><th>value</th><th>ret</th></tr></thead>
-          <tbody></tbody>
-        </table>
-      </div>
-      <p class="note">
-        Each row was collected with <span class="mono">@torch.no_grad()</span> — no gradients yet, just recording what happened.
-        <b>Notice what is NOT recorded:</b> the correct move. Nobody looked it up. Not even the solver was consulted.
-      </p>
     </div>
   `;
 

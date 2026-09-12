@@ -1,0 +1,121 @@
+{
+  "$schema": "https://aka.ms/codetour-schema",
+  "title": "PPO on tic-tac-toe — full walkthrough",
+  "description": "Follow the reward from 'game over' all the way back to a gradient step. 19 stops across game.py, model.py, rollout.py, train_ppo.py, evaluate.py and play.py.",
+  "steps": [
+    {
+      "title": "Start here: there is no dataset",
+      "file": "finetune-demo/tictactoe-ppo/game.py",
+      "line": 1,
+      "description": "**GPT-2 learns tic-tac-toe from nothing but the final score of each game.**\n\nNobody ever shows it a correct move. No labels, no preferences, no demonstrations — the whole training signal is `+1 win / 0 draw / -1 loss`, handed over only once the game is already finished.\n\nThis tour follows that single number backwards: where it enters the code, how it gets spread over the individual moves, and how it ends up as a gradient step. Six files, 19 stops.\n\nHit **→** (or `Ctrl+Right`) to move on."
+    },
+    {
+      "title": "The only reward signal that exists",
+      "file": "finetune-demo/tictactoe-ppo/game.py",
+      "line": 63,
+      "description": "This function is the *entire* supervision budget for the run.\n\nThree possible values, produced once per game, from the agent's point of view. Everything else in this repo — the solver, the opponents, the evaluation — is scaffolding around these three numbers.\n\nCompare it with the other two demos in `finetune-demo/`: Part 1 needs gold JSON for every example, Part 2 needs a reward function that scores a *completion*. Here the environment simply ends and says how it went."
+    },
+    {
+      "title": "The solver: grader and sparring partner, never a target",
+      "file": "finetune-demo/tictactoe-ppo/game.py",
+      "line": 78,
+      "description": "Tic-tac-toe is small enough to solve exactly, so we always know the right answer.\n\n**That knowledge is deliberately kept away from training.** `_minimax` is used in exactly two places: as the strong practice opponent, and as the grader that says whether a move was correct.\n\nIf its output were ever fed back as a training target this would be supervised learning wearing an RL costume — and the result would tell you nothing about whether RL works. Keeping it out is what makes the numbers at the end meaningful."
+    },
+    {
+      "title": "The prompt stops mid-sentence",
+      "file": "finetune-demo/tictactoe-ppo/game.py",
+      "line": 158,
+      "description": "Two deliberate choices in this string:\n\n1. It ends on `\"Best cell:\"` with nothing after it. A language model's whole job is predicting what comes next — cut it off here and **the next token it wants to produce *is* the move**. No parsing, no output format to learn.\n2. `Legal cells:` is listed explicitly, so the model can attend to that line instead of inferring emptiness from the ASCII grid.\n\n`PROMPT_VERSION` at the top of the file guards this: change the template and every existing checkpoint becomes incomparable, so `load_checkpoint` refuses it."
+    },
+    {
+      "title": "4,520 positions — grading with zero sampling noise",
+      "file": "finetune-demo/tictactoe-ppo/game.py",
+      "line": 182,
+      "description": "This walks the game tree and returns **every position in which a move is required** — all 4,520 of them, 3,142 with exactly one correct answer.\n\nThat makes the position-level evaluation exhaustive rather than sampled: no confidence intervals needed, no lucky opponents, nothing to re-run. A luxury you never get on a real task, and the reason tic-tac-toe is the right toy here.\n\n`chance_baselines()` just below computes what pure guessing scores (top-1 0.494, blunder 0.340) so \"50% correct\" can be read for what it is: nothing."
+    },
+    {
+      "title": "Nine answer tokens, resolved not hardcoded",
+      "file": "finetune-demo/tictactoe-ppo/model.py",
+      "line": 78,
+      "description": "GPT-2 can emit ~50,000 tokens. We only ever look at nine: the digits 0-8.\n\nTokenizers disagree about how a digit is spelled mid-sentence, so we *try* `\" 0\"` (leading space, GPT-2's usual form) and fall back to `\"0\"`, keeping whichever gives one token per digit. The winning scheme is written into the checkpoint manifest, so evaluation months later uses exactly the same nine tokens.\n\nNote `padding_side = \"left\"` in `__init__` above: it keeps the decision position at index `-1` for every prompt in a batch, which is what makes batched play possible at all."
+    },
+    {
+      "title": "Illegal moves are impossible, not penalised",
+      "file": "finetune-demo/tictactoe-ppo/model.py",
+      "line": 123,
+      "description": "The single most important line in the model.\n\nThe line above reads only the 9 logit rows belonging to our answer tokens; this one sets occupied cells to `-inf`, so after the softmax their probability is **exactly zero**.\n\nA naive setup would let the model play an occupied cell and punish it with negative reward. You would then spend most of training teaching it the output format, and the reward signal for *move quality* would be drowned out. Here that entire failure mode is removed by construction: every gradient step is spent on which legal move is better.\n\nThe value head on the next line answers a different question — \"how well is this position going to go for me?\" — which PPO needs in order to judge surprise."
+    },
+    {
+      "title": "The critic gets its own learning rate",
+      "file": "finetune-demo/tictactoe-ppo/model.py",
+      "line": 127,
+      "description": "Two parameter groups: the pretrained GPT-2 backbone at `lr` (3e-5, small — it already knows how to be a language model), and the freshly initialised value head at `value_lr` (3e-4, 10x larger — it knows nothing).\n\nRun both at one learning rate and you pick a loser: either the critic never calibrates, or the policy gets shoved around. This split, plus the warm-up at step 15, is most of what makes the run stable."
+    },
+    {
+      "title": "Every game moves at once",
+      "file": "finetune-demo/tictactoe-ppo/rollout.py",
+      "line": 73,
+      "description": "Games are **not** played one at a time. Every game currently waiting on the model has its prompt collected, encoded together, and answered by a single forward pass.\n\nThe opponent loop just above advances each game until it is our turn, then all live games step simultaneously. This is the difference between minutes and hours — and the reason 128 games per iteration is affordable."
+    },
+    {
+      "title": "The four things PPO will need later",
+      "file": "finetune-demo/tictactoe-ppo/rollout.py",
+      "line": 78,
+      "description": "For each of *its own* decisions we record: the `prompt`, the `action` taken, `logp` (how confident it was) and `value` (what it expected).\n\n**Notice what is not recorded: the correct move.** Nobody looked it up; the solver was never consulted. At this point in the run the code has no idea whether any of these moves were good.\n\nAlso note what's collected — only the agent's own decisions. The opponent's moves are part of the environment, not something we take credit or blame for."
+    },
+    {
+      "title": "Credit assignment, in one line",
+      "file": "finetune-demo/tictactoe-ppo/rollout.py",
+      "line": 90,
+      "description": "The game just ended and produced one number, `r`. This spreads it back over the moves that led there, decayed by `gamma ** (T - 1 - t)`.\n\nThe last move before a win gets ~the full +1; the opening move of that same game gets less. That is the entire answer to \"which of my nine decisions was responsible?\" — a discount factor and a guess.\n\nIt is a crude answer, and it works because we play thousands of games: moves that genuinely help win show up in winning games more often than not, and the noise averages out. Everything downstream is bookkeeping on top of this line."
+    },
+    {
+      "title": "Advantage = surprise",
+      "file": "finetune-demo/tictactoe-ppo/train_ppo.py",
+      "line": 49,
+      "description": "`rets` is what actually happened; `values` is what the critic expected before the move. The difference is the **advantage**: not \"was this good?\" but \"was this *better than I expected*?\"\n\nWhy the distinction matters: winning against a random opponent is easy and expected, so it should barely move the weights. Winning a position the critic thought was lost is information.\n\nBecause the reward only arrives at the end of the game, the usual GAE machinery collapses to this single subtraction. The normalisation on the next line keeps the update scale stable as the opponent gets harder."
+    },
+    {
+      "title": "The clipped objective — the actual PPO idea",
+      "file": "finetune-demo/tictactoe-ppo/train_ppo.py",
+      "line": 61,
+      "description": "`ratio` is how much more (or less) likely this move has become since the games were played. Multiply by the advantage and you get the plain policy-gradient update: make surprisingly-good moves more likely.\n\nThe `min` against a version clamped to `[0.8, 1.2]` is the clip. It refuses to reward a move for moving more than ±20%, which caps how far one batch can drag the policy.\n\n**That cap is what buys the 4 epochs.** Without it you could take one gradient step per batch of games before the data went stale; with it, each batch of 128 games is reused four times. Same games, four times the learning."
+    },
+    {
+      "title": "Separate gradient budgets (a real bug, fixed)",
+      "file": "finetune-demo/tictactoe-ppo/train_ppo.py",
+      "line": 71,
+      "description": "Policy params clip at 1.0, value params at 10.0 — **two calls, deliberately**.\n\nAn earlier version of this experiment clipped everything with one global norm. The freshly initialised critic produces huge gradients early on; a single shared clip then scales *the policy's* gradient down along with the critic's, and the policy quietly stops learning. No error, no warning — just a flat `loss_rate` curve.\n\nThis is why `gn_pol` is printed every iteration. If it sits far above 1.0 for long, the policy update is being clipped hard and progress will be slow."
+    },
+    {
+      "title": "Warm up the critic, then let the policy move",
+      "file": "finetune-demo/tictactoe-ppo/train_ppo.py",
+      "line": 100,
+      "description": "For the first `critic_warmup` iterations the backbone learning rate is set to **0**: only the value head trains.\n\nThe reason follows from step 12 — advantage is `return − value`. While the critic is random, \"surprise\" is noise, and training the policy on it is worse than not training at all.\n\nDirectly below, the opponent curriculum anneals from 100% random to 20% random over the first 60% of training. Early on the model must win *sometimes* or there is no signal to learn from; later, a random opponent has nothing left to teach.\n\nThis is also why mean `reward` looks flat in the logs by design: the opponent gets harder at roughly the rate the model gets better."
+    },
+    {
+      "title": "\"Before\" means this exact network",
+      "file": "finetune-demo/tictactoe-ppo/train_ppo.py",
+      "line": 211,
+      "description": "The untrained policy is written to disk **before a single weight is touched**.\n\nSo the \"before\" column later is not a re-initialised model, not a different seed, not GPT-2 downloaded again — it is precisely the network that is about to be trained. Same weights, same random value head, same tokenizer.\n\nCheap to do, and it removes an entire class of \"was the comparison fair?\" objection."
+    },
+    {
+      "title": "One evaluation, run twice, unchanged",
+      "file": "finetune-demo/tictactoe-ppo/rollout.py",
+      "line": 169,
+      "description": "The same function grades both checkpoints: same number of games, same two opponents, same exhaustive position sweep.\n\n`vs_random` is what people intuitively want — but it saturates, because an agent that cannot defend still beats a random opponent most of the time. `positions=exhaustive_score(...)` is the honest measurement: all 4,520 positions, graded against the solver, reporting top-1, blunder rate, and top-1 on the 3,142 forced positions.\n\n`evaluate.py` also reseeds before each checkpoint, so both models face the same random opponents rather than playing separate lotteries."
+    },
+    {
+      "title": "A verdict that cannot drift from the numbers",
+      "file": "finetune-demo/tictactoe-ppo/evaluate.py",
+      "line": 72,
+      "description": "The closing paragraph is generated from the measured values — including the \"DID learn / did NOT clearly learn\" sentence, which is a condition on loss rate and top-1, not a judgement call.\n\nWrite that conclusion by hand and it survives a re-run that contradicts it. Generate it, and a bad run says so out loud. The same discipline as `RESULTS.md` in the parent folder: every number came from a run recorded here."
+    },
+    {
+      "title": "Now go look at what it learned",
+      "file": "finetune-demo/tictactoe-ppo/play.py",
+      "line": 119,
+      "description": "The tour ends where the interesting part starts.\n\n`--inspect` takes a board (`X..OO.... X`) and prints the model's probability for every empty cell, its value estimate, and which cells the solver considers correct. That shows *what* it learned, not just whether a metric moved — e.g. whether it has understood \"block the fork\" or is simply good at taking wins that are already on the board.\n\nRun it with:\n\n```\ncd finetune-demo/tictactoe-ppo\nuv run --project .. python play.py --inspect\n```\n\nFrom here: `train_ppo.py --quick` to train, `evaluate.py` to measure, `play.py` to play."
+    }
+  ]
+}
